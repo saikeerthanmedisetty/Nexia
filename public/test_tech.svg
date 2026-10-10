@@ -1,0 +1,80 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cyberBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#05070e" />
+      <stop offset="40%" stop-color="#0b1120" />
+      <stop offset="100%" stop-color="#030509" />
+    </linearGradient>
+    <linearGradient id="cyanNeon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f2fe" />
+      <stop offset="100%" stop-color="#4facfe" />
+    </linearGradient>
+    <linearGradient id="purpleNeon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f72585" />
+      <stop offset="100%" stop-color="#7209b7" />
+    </linearGradient>
+    <linearGradient id="emeraldNeon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00ff88" />
+      <stop offset="100%" stop-color="#60efff" />
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#00f2fe" stroke-width="0.75" opacity="0.12" />
+    </pattern>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1280" height="720" fill="url(#cyberBg)" />
+  <!-- Grid Matrix Overlay -->
+  <rect width="1280" height="720" fill="url(#grid)" />
+
+  <!-- Cyberpunk Atmospheric Lighting Orbs -->
+  <circle cx="1120" cy="180" r="320" fill="#00f2fe" opacity="0.18" />
+  <circle cx="240" cy="600" r="360" fill="#f72585" opacity="0.16" />
+  <circle cx="850" cy="500" r="280" fill="#7209b7" opacity="0.14" />
+
+  <!-- Code Accent Graphic (Right Side) -->
+  <g opacity="0.85" transform="translate(860, 200)">
+    <!-- Terminal Window Container -->
+    <rect x="0" y="0" width="360" height="340" rx="16" fill="#0b0f19" stroke="#00f2fe" stroke-width="2" opacity="0.9" />
+    <rect x="0" y="0" width="360" height="42" rx="16" fill="#131c2e" />
+    <circle cx="24" cy="21" r="6" fill="#ff5f56" />
+    <circle cx="44" cy="21" r="6" fill="#ffbd2e" />
+    <circle cx="64" cy="21" r="6" fill="#27c93f" />
+    <text x="180" y="27" font-family="monospace" font-size="13" fill="#94a3b8" text-anchor="middle">n8n_ai_agent.ts</text>
+    
+    <!-- Code Snippet -->
+    <text x="24" y="80" font-family="monospace" font-size="14" fill="#f72585">const agent = new Agent({</text>
+    <text x="44" y="115" font-family="monospace" font-size="14" fill="#00f2fe">  trigger: "telegram",</text>
+    <text x="44" y="150" font-family="monospace" font-size="14" fill="#00ff88">  llm: "gemini-3.5-flash",</text>
+    <text x="44" y="185" font-family="monospace" font-size="14" fill="#ffbd2e">  fallback: "defensive.js"</text>
+    <text x="24" y="220" font-family="monospace" font-size="14" fill="#f72585">});</text>
+    <text x="24" y="260" font-family="monospace" font-size="14" fill="#94a3b8">// Status: 200 OK ✅</text>
+    <text x="24" y="295" font-family="monospace" font-size="14" fill="#00f2fe">&gt; Pipeline executing...</text>
+  </g>
+
+  <!-- High-Contrast Category Badges -->
+  <g transform="translate(80, 75)">
+    <rect x="0" y="0" width="180" height="42" rx="10" fill="#f72585" />
+    <text x="90" y="27" font-family="Arial, sans-serif" font-size="15" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">AI AUTOMATION</text>
+
+    <rect x="195" y="0" width="140" height="42" rx="10" fill="#00f2fe" opacity="0.2" stroke="#00f2fe" stroke-width="1.5" />
+    <text x="265" y="27" font-family="monospace" font-size="15" font-weight="800" fill="#00f2fe" text-anchor="middle">n8n + GEMINI</text>
+  </g>
+
+  <!-- Big Punchy Cyberpunk Typography -->
+  <text x="80" y="235" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="900" fill="#ffffff" letter-spacing="-2">BUILD AUTOMATED</text>
+  <text x="80" y="325" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="900" fill="url(#cyanNeon)" letter-spacing="-2">AI AGENTS</text>
+  <text x="80" y="415" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="900" fill="url(#purpleNeon)" letter-spacing="-1">WITH N8N &amp; GEMINI</text>
+
+  <!-- Subtitle Feature Pills -->
+  <text x="80" y="500" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#94a3b8">
+    Telegram Bot Trigger • JSON Parsing • Defensive JS
+  </text>
+
+  <!-- Action / Status Indicator -->
+  <g transform="translate(80, 560)">
+    <rect x="0" y="0" width="290" height="58" rx="29" fill="#000000" stroke="#00ff88" stroke-width="2.5" />
+    <circle cx="32" cy="29" r="8" fill="#00ff88" />
+    <text x="155" y="38" font-family="Arial, sans-serif" font-size="19" font-weight="900" fill="#00ff88" text-anchor="middle" letter-spacing="1">FULL TUTORIAL ▶</text>
+  </g>
+</svg>

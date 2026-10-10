@@ -1,0 +1,31 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16" />
+      <stop offset="50%" stop-color="#131c2e" />
+      <stop offset="100%" stop-color="#050811" />
+    </linearGradient>
+    <linearGradient id="textGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f2fe" />
+      <stop offset="100%" stop-color="#4facfe" />
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)" />
+  <circle cx="1100" cy="180" r="280" fill="#00f2fe" opacity="0.15" />
+  <circle cx="200" cy="560" r="320" fill="#ff0844" opacity="0.1" />
+  
+  <!-- Badge -->
+  <rect x="80" y="80" width="210" height="44" rx="10" fill="#ff0033" />
+  <text x="185" y="109" font-family="Arial, sans-serif" font-size="18" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="2">4K ULTRA HD</text>
+  
+  <!-- Main Title -->
+  <text x="80" y="270" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="900" fill="#ffffff" letter-spacing="-2">EVERYDAY</text>
+  <text x="80" y="370" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="900" fill="url(#textGlow)" letter-spacing="-2">MOMENTS</text>
+  
+  <!-- Subtitle -->
+  <text x="80" y="460" font-family="Arial, sans-serif" font-size="32" font-weight="700" fill="#94a3b8">Raw &amp; Casual Perspective • Sai Keerthan</text>
+  
+  <!-- CTA Button -->
+  <rect x="80" y="550" width="320" height="64" rx="32" fill="#000000" stroke="#00f2fe" stroke-width="3" />
+  <text x="240" y="592" font-family="Arial, sans-serif" font-size="22" font-weight="800" fill="#00f2fe" text-anchor="middle" letter-spacing="1">WATCH NOW ▶</text>
+</svg>

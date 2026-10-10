@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# credentials & OAuth tokens
+.google-tokens.json
+*.key
+*.secret
+credentials.json
+token.json
+.auth-store.json
+.calendar-store.json
+.tasks-store.json
+.shared-chats.json
+.uber-browser-profile/
+scratch/

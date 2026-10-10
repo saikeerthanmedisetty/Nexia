@@ -1,0 +1,601 @@
+const fs = require('fs');
+const path = require('path');
+const { chromium } = require('playwright-core');
+
+const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const projectRoot = path.resolve(__dirname, '..');
+const htmlPath = path.join(projectRoot, 'public', 'NEXIA_CASE_STUDY.html');
+const pdfPath = path.join(projectRoot, 'NEXIA_CASE_STUDY.pdf');
+const publicPdfPath = path.join(projectRoot, 'public', 'NEXIA_CASE_STUDY.pdf');
+
+const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nexia: Architecture of an Autonomous AI Executive Assistant</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    @page {
+      size: A4;
+      margin: 16mm 14mm 16mm 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      line-height: 1.6;
+      font-size: 13.5px;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    /* Executive Header */
+    .header-banner {
+      background: linear-gradient(135deg, #070b14 0%, #0f172a 50%, #1e1b4b 100%);
+      color: #ffffff;
+      padding: 32px 28px;
+      border-radius: 14px;
+      margin-bottom: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
+    }
+
+    .header-tag {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #cbd5e1;
+      font-weight: 400;
+      margin-bottom: 16px;
+    }
+
+    .meta-bar {
+      display: flex;
+      gap: 20px;
+      font-size: 11px;
+      color: #94a3b8;
+      font-family: 'JetBrains Mono', monospace;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding-top: 12px;
+    }
+
+    .meta-bar span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Typography */
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.3px;
+      margin-top: 26px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e2e8f0;
+      page-break-after: avoid;
+    }
+
+    h3 {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-top: 16px;
+      margin-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    p {
+      margin-bottom: 12px;
+      color: #334155;
+      text-align: justify;
+    }
+
+    /* Callout Card */
+    .callout {
+      background: #f8fafc;
+      border-left: 4px solid #6366f1;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      margin: 16px 0;
+      font-size: 13px;
+      color: #334155;
+      page-break-inside: avoid;
+    }
+
+    .callout strong {
+      color: #1e293b;
+    }
+
+    /* Architecture Diagram Box */
+    .diagram-box {
+      background: #090d16;
+      color: #e2e8f0;
+      padding: 16px;
+      border-radius: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      line-height: 1.35;
+      margin: 16px 0;
+      border: 1px solid #1e293b;
+      overflow-x: auto;
+      white-space: pre;
+      page-break-inside: avoid;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: #090d16;
+      color: #f1f5f9;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      margin: 14px 0;
+      border: 1px solid #1e293b;
+      overflow-x: auto;
+      page-break-inside: avoid;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: #f1f5f9;
+      color: #4338ca;
+      padding: 2px 5px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      border: none;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 12px;
+      page-break-inside: avoid;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 600;
+      text-align: left;
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+
+    td {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Agent Cards Grid */
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin: 14px 0;
+      page-break-inside: avoid;
+    }
+
+    .agent-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      page-break-inside: avoid;
+    }
+
+    .agent-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .agent-desc {
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.45;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 9.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #e0e7ff;
+      color: #4338ca;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 12px;
+      color: #334155;
+    }
+
+    li {
+      margin-bottom: 4px;
+    }
+
+    /* Footer */
+    .doc-footer {
+      margin-top: 36px;
+      padding-top: 14px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 11px;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Print Page Controls */
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- Executive Banner -->
+    <div class="header-banner">
+      <div class="header-tag">Technical Architectural Case Study</div>
+      <h1>Nexia: Architecture of an Autonomous AI Executive Assistant</h1>
+      <div class="subtitle">Engineering an Enterprise-Grade Multi-Agent Orchestration Ecosystem with Next.js, n8n, MongoDB Atlas, and Google Gemini.</div>
+      <div class="meta-bar">
+        <span>AUTHOR: Saikeerthan Medisetty</span>
+        <span>PLATFORM: nexia.ai</span>
+        <span>VERSION: 2.4.0 (Production)</span>
+        <span>STATUS: Enterprise Mesh Active</span>
+      </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <h2>Executive Summary</h2>
+    <p>Modern AI assistants frequently suffer from two fatal architecture flaws: <strong>The Chatbot Fallacy</strong> (acting as purely conversational text-generators detached from real actions) and <strong>The Brittle Monolith</strong> (hardcoding business logic and third-party APIs directly into a single backend). When an AI assistant attempts to schedule a flight, manage a financial ledger, or publish media, conversational ambiguity leads to catastrophic failures, rate-limit crashes, or irreversible unauthorized actions.</p>
+    
+    <p><strong>Nexia</strong> was designed from first principles to solve this paradigm. Nexia is a <strong>Tech-Forward Autonomous AI Executive Assistant</strong> that unifies a high-performance <strong>Next.js 16 (React 19)</strong> conversational frontend with an <strong>n8n event-driven workflow backend</strong>, grounded in persistent <strong>MongoDB Atlas</strong> state and powered by <strong>Google Gemini 3.5 Flash Lite</strong> models.</p>
+
+    <div class="callout">
+      <strong>Core Value Proposition:</strong> Nexia executes coordinated, deterministic, and audited tasks across seven enterprise domains through an innovative <strong>Block-Based JSON UI Schema</strong>, guaranteed by strict <strong>Human-in-the-Loop (HITL)</strong> safeguards and hardened against distributed network failures.
+    </div>
+
+    <div class="diagram-box">
+                                  ┌────────────────────────────────────────────────────────┐
+                                  │                  NEXIA ARCHITECTURE                    │
+                                  └────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────┐               ┌──────────────────────────────────────────────┐
+    │     Next.js 16 React Client      │               │           MongoDB Atlas Cloud                │
+    │  (Framer Motion / Tailwind CSS)  │               │   • Persistent Profiles & Preferences        │
+    └─────────────────┬────────────────┘               │   • Dynamic Prompt Context Ledger            │
+                      │ HTTPS POST                     └──────────────────────┬───────────────────────┘
+                      ▼                                                       │ Read State / User Context
+    ┌─────────────────────────────────────────────────────────────────────────┴───────────────────────┐
+    │                        Next.js Central Orchestrator & Coordinator Engine                        │
+    │   • Intent Classification (Gemini 3.5)   • Dynamic Context Hydration   • Defensive Error Shield │
+    └─────────────────┬───────────────────────────────────────────────────────────────────────────────┘
+                      │
+                      │ Authenticated HTTP Webhooks (Dual Redundancy: /webhook/ & /webhook-test/)
+                      ▼
+    ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+    │                                n8n Event-Driven Orchestration Mesh                              │
+    │                                                                                                 │
+    │  [1. Gmail Agent]      [2. Calendar Agent]    [3. Finance / Sheets]    [4. Mobility / Uber]     │
+    │   • HITL Drafting       • Conflict Auditing    • Gemini Vision OCR      • Live Fare & Deep-Link │
+    │                                                                                                 │
+    │  [5. YouTube Agent]    [6. Chief of Staff]    [7. Deep Research]                                │
+    │   • Media Pipeline      • Morning Dossier      • 3-Phase Fan-Out & Block Synthesizer            │
+    └─────────────────────────────────────────────────────────────────────────────────────────────────┘</div>
+
+    <!-- Section 1 -->
+    <h2>1. The Vision & Architecture: The "Zero-Assumption" Platform</h2>
+    <p>The foundational principle governing Nexia is the <strong>Zero-Assumption Contract</strong>: <em>The backend should never make assumptions about the user, and the frontend should never be exposed to backend fragility.</em></p>
+
+    <h3>1.1 Zero Backend Exposure</h3>
+    <p>In naive agent architectures, client applications communicate directly with external service endpoints or expose complex database queries and raw webhook strings to the browser. Nexia enforces an impenetrable perimeter:</p>
+    <ul>
+      <li><strong>The Coordinator Gateway:</strong> All client interactions pass through protected Next.js API route handlers (<code>/api/chat</code> and <code>/api/agents</code>).</li>
+      <li><strong>Zero Technical Leakage:</strong> Even during third-party timeouts, rate limits, or network partitions, raw stack traces, n8n webhook URLs, and internal JSON errors are intercepted by coordinator sanitizers. Users receive actionable, high-empathy status notices with contextual next steps.</li>
+      <li><strong>Dual URL Redundancy:</strong> Development and production pipelines frequently conflict in webhook architectures. Nexia's transport layer automatically executes an adaptive failover protocol between production webhooks (<code>/webhook/</code>) and active test listeners (<code>/webhook-test/</code>). If a 404 is encountered, the coordinator retries the alternate endpoint seamlessly before returning an error.</li>
+    </ul>
+
+    <h3>1.2 Dynamic MongoDB State Injection</h3>
+    <p>Traditional AI systems hardcode user preferences (e.g., location, executive title, company policies) into static system prompts or code constants. Nexia eliminates hardcoding entirely through <strong>Runtime Context Hydration</strong>:</p>
+    <ol>
+      <li>When a user submits an inquiry, the Next.js coordinator pulls the active user profile, recent behavioral telemetry, and preferences directly from MongoDB Atlas.</li>
+      <li>The user context (<code>name</code>, <code>city</code>, <code>preferred_mobility_tier</code>, <code>financial_rules</code>) is injected dynamically into the request payload dispatched to n8n.</li>
+      <li>n8n workflows consume this dynamic state via upstream context-normalization nodes (<code>Normalize Research Context</code>, <code>Normalize Executive State</code>).</li>
+      <li>As a result, the identical workflow dynamically adapts whether executed for a startup CEO in Mumbai or a research director in San Francisco, with <strong>zero backend code modifications</strong>.</li>
+    </ol>
+
+    <!-- Section 2 -->
+    <div class="page-break"></div>
+    <h2>2. The Agent Portfolio: The 7 Pillars of Nexia</h2>
+    <p>Nexia coordinates seven domain-specific agents, each engineered with specialized cognitive guardrails and integration pipelines:</p>
+
+    <div class="agent-grid">
+      <div class="agent-card">
+        <div class="agent-title">✉️ 1. Gmail Agent <span class="badge">Communication</span></div>
+        <div class="agent-desc">Performs high-priority inbox audits and client thread analysis. Implements a mandatory <strong>Human-in-the-Loop (HITL)</strong> approval card before dispatching any email via the Gmail API, completely preventing unauthorized actions.</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-title">📅 2. Google Calendar Agent <span class="badge">Productivity</span></div>
+        <div class="agent-desc">Performs schedule conflict audits, automatically computes transit time buffers between physical meeting locations, and safely handles <strong>HTTP 409 Conflict</strong> notifications by proposing alternative time slots.</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-title">📊 3. Sheets & OCR Agent <span class="badge">Finance</span></div>
+        <div class="agent-desc">Combines <strong>Cloudinary</strong> CDN storage with <strong>Google Gemini Vision</strong> for receipt OCR. Parses line items, merchant, tax, and date, appending records to Google Sheets with automatic mirror-persistence to MongoDB Atlas.</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-title">🚗 4. Uber Mobility Agent <span class="badge">Logistics</span></div>
+        <div class="agent-desc">Features real-time distance matrix calculations, multi-tier fare matrices, 1-click universal booking links, and an autonomous <strong>Playwright</strong> headless browser dispatch engine with live GPS telemetry streaming.</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-title">🎬 5. YouTube Media Agent <span class="badge">Media</span></div>
+        <div class="agent-desc">Autonomous video discovery, transcript intelligence extraction, and automated chapter markers. Bundles high-resolution thumbnails and triggers authenticated uploads directly to YouTube Studio.</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-title">👑 6. Chief of Staff Agent <span class="badge">Executive</span></div>
+        <div class="agent-desc">The master executive orchestrator. Concurrently fans out to Calendar, Gmail, and Sheets to synthesize schedule, inbox flags, and 7-day budget burn rate into an interactive <strong>Bento-Box Executive Morning Dossier</strong>.</div>
+      </div>
+    </div>
+
+    <div class="agent-card" style="margin-top: 4px;">
+      <div class="agent-title">🌐 7. Deep Web Research Agent <span class="badge">Intelligence</span></div>
+      <div class="agent-desc">Perplexity-grade research engine executing a 3-phase pipeline: <strong>(1) Vector Decomposition</strong> of inquiries into 3–5 targeted queries, <strong>(2) Tavily Search Fan-Out</strong> over live web sources in parallel, and <strong>(3) Intelligence Synthesis</strong> adhering strictly to our Block-Based JSON schema with verified inline citation pills.</div>
+    </div>
+
+    <!-- Section 3 -->
+    <h2>3. The Technical Masterpiece: Block-Based JSON UI Schema</h2>
+    <p>Traditional AI frontends suffer from <strong>The UI Collapse Dilemma</strong>: raw Markdown output frequently breaks on multi-column tables, cannot support custom React widgets, and results in monotonous walls of text. Conversely, rigid static schemas stifle the LLM's reasoning freedom.</p>
+    
+    <p>Nexia pioneered a <strong>Dynamic Block-Based JSON Architecture</strong> (inspired by Notion), where the synthesizer LLM returns an array of discrete, polymorphic UI blocks:</p>
+
+    <pre><code>{
+  "topic": "Flagship ANC Headphone Comparison: Sony WH-1000XM5 vs. Bose QC Ultra vs. Apple AirPods Max",
+  "executiveSummary": "A comparison of premium over-ear headphones highlights trade-offs between pricing, comfort, battery longevity, and durability [1].",
+  "blocks": [
+    {
+      "type": "comparison_matrix",
+      "headers": ["Feature", "Sony WH-1000XM5", "Bose QC Ultra", "Apple AirPods Max"],
+      "rows": [
+        ["Retail Price", "$399.99", "$429.00", "$549.00"],
+        ["Weight", "250g", "253g", "384.8g"],
+        ["Battery Life", "Up to 30 hours", "Up to 24 hours", "Up to 20 hours"]
+      ]
+    },
+    {
+      "type": "key_insights",
+      "items": [
+        "The Sony WH-1000XM5 offers the lightest build and longest battery life [1].",
+        "Apple AirPods Max are significantly heavier, impacting extended wear comfort [1]."
+      ]
+    },
+    {
+      "type": "deep_dive",
+      "content": "User discussions highlight structural durability concerns. Sony users report pivot joint snap-risk under travel strain."
+    }
+  ],
+  "citations": [
+    { "id": 1, "url": "https://www.rtings.com/headphones" }
+  ]
+}</code></pre>
+
+    <div class="callout">
+      <strong>Engineering Impact:</strong> This architecture gives the LLM cognitive flexibility to select the optimal presentation format (matrices, bullet points, narrative prose) while providing the React frontend with a 100% typed, predictable, crash-proof layout.
+    </div>
+
+    <!-- Section 4 -->
+    <div class="page-break"></div>
+    <h2>4. Production Resilience & Hard Constraints</h2>
+    <p>Building an autonomous enterprise pipeline requires defensive engineering against non-deterministic LLM variance, external rate limits, and network volatility:</p>
+
+    <h3>4.1 The Cognitive Lock (Zero Temperature & Few-Shot Anchoring)</h3>
+    <p>When users ask for a "table" or "comparison," LLMs tend to default to conversational markdown tables. Nexia enforces a three-layer constraint:</p>
+    <ul>
+      <li><strong>Sampling Temperature = 0:</strong> Drops model creative variance to zero, guaranteeing deterministic token output.</li>
+      <li><strong>Strict API Persona:</strong> The System prompt frames the model as a strict JSON-only backend API forbidden from conversational commentary.</li>
+      <li><strong>Few-Shot Anchor Injection:</strong> A concrete, miniature example output is placed directly in the System prompt so the model physically anchors to the schema before reading raw data.</li>
+    </ul>
+
+    <h3>4.2 Parser Defense: Defensive JSON Extraction</h3>
+    <p>Native parsers crash when LLMs wrap valid JSON in markdown code fences or add trailing text. Nexia implements a dedicated <strong>Defensive JSON Extraction</strong> Code Node in n8n:</p>
+
+    <pre><code>const raw = $input.first().json.text || $input.first().json.response || '';
+let cleaned = raw.trim();
+
+// 1. Strip Markdown Code Fences
+const fenceMatch = cleaned.match(/\`\`\`(?:json)?\\s*([\\s\\S]*?)\\s*\`\`\`/);
+if (fenceMatch) {
+  cleaned = fenceMatch[1].trim();
+} else {
+  // 2. Fallback: Extract outermost matching braces
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1).trim();
+  }
+}
+
+try {
+  return [{ json: JSON.parse(cleaned) }];
+} catch (e) {
+  return [{ json: { topic: "Report", executiveSummary: raw, blocks: [], citations: [] } }];
+}</code></pre>
+
+    <h3>4.3 Parallel Fan-Out Resilience</h3>
+    <p>In Phase 2 of Deep Research, queries fan out simultaneously over the Tavily Search API. Nexia implements <strong>Continue On Fail</strong> and <strong>3x Exponential Backoff Retries</strong> (1s &rarr; 3s &rarr; 6s). If one query encounters a rate limit, the pipeline continues without failing the entire user request.</p>
+
+    <!-- Section 5 -->
+    <h2>5. System Specifications & Technology Stack</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Layer</th>
+          <th>Technologies</th>
+          <th>Key Responsibility</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Frontend UI</strong></td>
+          <td>Next.js 16, React 19, Tailwind CSS, Framer Motion</td>
+          <td>Chat interface, Block-Based UI rendering, HITL approval cards, responsive tables.</td>
+        </tr>
+        <tr>
+          <td><strong>Orchestration</strong></td>
+          <td>Next.js API Routes, Server Components</td>
+          <td>Intent classification, dynamic MongoDB state hydration, dual-URL failover.</td>
+        </tr>
+        <tr>
+          <td><strong>Workflow Mesh</strong></td>
+          <td>n8n Platform (Self-Hosted / Cloud)</td>
+          <td>Event-driven agent workflows, webhook management, parallel fan-out loops.</td>
+        </tr>
+        <tr>
+          <td><strong>AI Models</strong></td>
+          <td>Google Gemini 3.5 Flash Lite, Gemini Vision</td>
+          <td>High-speed decomposition, multimodal receipt OCR, and JSON synthesis.</td>
+        </tr>
+        <tr>
+          <td><strong>Search Engine</strong></td>
+          <td>Tavily Search API</td>
+          <td>Autonomous real-time web search and live source aggregation.</td>
+        </tr>
+        <tr>
+          <td><strong>State & Database</strong></td>
+          <td>MongoDB Atlas, JWT, bcryptjs</td>
+          <td>User context, executive preferences, transaction ledger persistence.</td>
+        </tr>
+        <tr>
+          <td><strong>Mobility Engine</strong></td>
+          <td>Playwright (Chromium Headless)</td>
+          <td>Automated browser dispatch on m.uber.com and telemetry streaming.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Conclusion -->
+    <h2>6. Conclusion: The Paradigm Shift in Agentic Orchestration</h2>
+    <p>Nexia represents a fundamental evolution in agentic design. By decoupling <strong>User Experience (Next.js)</strong> from <strong>Autonomous Workflow Execution (n8n)</strong> and grounding both in <strong>Dynamic Cloud State (MongoDB Atlas)</strong>, the platform transcends the boundaries of traditional conversational chatbots.</p>
+
+    <p>Nexia does not offer answers in a vacuum—it orchestrates an ecosystem. It audits schedules before booking rides, checks ledgers before approving payments, searches the open web before drawing conclusions, and requests human confirmation before publishing words to the world.</p>
+
+    <div class="callout">
+      <strong>The Final Verdict:</strong> This is not just a chat interface. <strong>Nexia is the blueprint for the next generation of autonomous executive intelligence.</strong>
+    </div>
+
+    <!-- Document Footer -->
+    <div class="doc-footer">
+      <span>Architected & Engineered by Saikeerthan Medisetty</span>
+      <span>Official Portal: https://nexia.ai</span>
+      <span>Nexia Platform &copy; 2026. All Rights Reserved.</span>
+    </div>
+
+  </div>
+</body>
+</html>
+`;
+
+async function build() {
+  console.log('Writing styled HTML to:', htmlPath);
+  fs.writeFileSync(htmlPath, htmlContent, 'utf8');
+
+  console.log('Launching headless Chrome to render PDF...');
+  const browser = await chromium.launch({
+    executablePath: CHROME_PATH,
+    headless: true,
+  });
+
+  const page = await browser.newPage();
+  await page.goto('file://' + htmlPath, { waitUntil: 'networkidle' });
+
+  console.log('Printing to PDF...');
+  await page.pdf({
+    path: pdfPath,
+    format: 'A4',
+    printBackground: true,
+    margin: {
+      top: '16mm',
+      bottom: '16mm',
+      left: '14mm',
+      right: '14mm',
+    },
+  });
+
+  // Also copy to public/ so it can be downloaded via browser at /NEXIA_CASE_STUDY.pdf
+  fs.copyFileSync(pdfPath, publicPdfPath);
+
+  await browser.close();
+  console.log('✅ PDF successfully created at:');
+  console.log('  1. ' + pdfPath);
+  console.log('  2. ' + publicPdfPath);
+}
+
+build().catch(err => {
+  console.error('Build failed:', err);
+  process.exit(1);
+});

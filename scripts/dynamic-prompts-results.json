@@ -1,0 +1,116 @@
+[
+  {
+    "id": 1,
+    "category": "Executive Scheduling (Natural Language)",
+    "prompt": "Can you pencil in an executive catch-up with Srikant from Matrix Partners on Friday at 3:30 PM regarding our Series A term sheet?",
+    "passed": true,
+    "durationMs": 7043,
+    "agent": "CALENDAR",
+    "type": "action_stage",
+    "action": "schedule",
+    "details": "Agent: CALENDAR, Action: schedule, Title matched: true",
+    "explanation": "📅 I've staged this reservation on your Executive Schedule. Please review and authorize below:"
+  },
+  {
+    "id": 2,
+    "category": "Financial Ledger (Natural Speech Expense)",
+    "prompt": "Booked a team celebration dinner at Farzi Cafe Hyderabad yesterday night for 6,420 rupees, put it on the company expense sheet under Team Building.",
+    "passed": true,
+    "durationMs": 1986,
+    "agent": "SHEETS",
+    "type": "action_stage",
+    "action": "append_row",
+    "details": "Agent: SHEETS, Amount: 6420, Merchant: Farzi Cafe Hyderabad, Category: Team Building",
+    "explanation": "💳 I've prepared this transaction entry for your review. Please authorize execution below:"
+  },
+  {
+    "id": 3,
+    "category": "Executive Mobility (Specific Pickup & Dropoff)",
+    "prompt": "I need an Uber Go from Gachibowli DLF Cybercity Gate 2 to Rajiv Gandhi International Airport Departures right now.",
+    "passed": true,
+    "durationMs": 2250,
+    "agent": "UBER",
+    "type": "action_stage",
+    "action": "book",
+    "details": "Agent: UBER, Pickup: Gachibowli DLF Cybercity Gate 2, Destination: Rajiv Gandhi International Airport Departures, Tier: Uber Go AC",
+    "explanation": "🚗 I've locked in your transit route. Please review parameters and authorize dispatch below:"
+  },
+  {
+    "id": 4,
+    "category": "Executive Correspondence (Formal Email Draft)",
+    "prompt": "Compose and send a formal email to priya.sharma@venturecapital.in introducing our platform and proposing a 20-minute Zoom sync next week.",
+    "passed": true,
+    "durationMs": 2456,
+    "agent": "EMAIL",
+    "type": "action_stage",
+    "action": "send",
+    "details": "Agent: EMAIL, To: priya.sharma@venturecapital.in, Subject: Platform Introduction & Proposed Zoom Sync",
+    "explanation": "✉️ **Executive Correspondence Prepared**\n\nI have drafted this dispatch for your approval before transmission:\n\n• **Recipient:** priya.sharma@venturecapital.in\n• **Subject:** Platform Introduction & Proposed Zoom Sync\n• **Key Highlights:** Introduction to our platform and proposal for a 20-minute Zoom sync next week.\n\n*Review the draft below and confirm transmission.*"
+  },
+  {
+    "id": 5,
+    "category": "Chief of Staff (Morning Dossier Synthesis)",
+    "prompt": "Give me a full executive briefing of my day: what meetings do I have lined up, what's my budget burn rate looking like, and any priority emails needing my eyes?",
+    "passed": true,
+    "durationMs": 3506,
+    "agent": "CHIEF_OF_STAFF",
+    "type": "action_stage",
+    "action": "briefing",
+    "details": "Agent: CHIEF_OF_STAFF, Type: action_stage, Has Dossier: true",
+    "explanation": "👑 **Executive Dossier**\n\nYour immediate operational focus is preparing for the back-to-back team meetings commencing at 04:00 pm. Financial health remains optimal with a weekly burn of ₹1,450, led by transportation expenses."
+  },
+  {
+    "id": 6,
+    "category": "Deep Web Intelligence (Complex Market Query)",
+    "prompt": "Conduct deep research on the competitive landscape of sovereign AI data centers in the UAE and Saudi Arabia in 2026, comparing energy costs and government subsidies.",
+    "passed": true,
+    "durationMs": 12918,
+    "type": "general",
+    "details": "Agent: undefined, Response length: 3216 chars",
+    "explanation": "📊 **Sovereign AI Data Center Competitive Landscape: UAE vs. Saudi Arabia (2026)**\n\nBy 2026, the United Arab Emirates and Saudi Arabia have established themselves as global powerhouses in sovereign artificial intelligence, fueled by aggressive national strategies, capital-intensive investments, and specialized digital infrastructure [1]. Both nations are leveraging abundant energy resources and massive state-backed subsidies to attract hyper-scalers and secure geopolitical independence in the AI value chain. While Saudi Arabia deploys colossal capital through the National Strategy for Data and AI (NSDAI) and Public Investment Fund (PIF) projects, the UAE leverages its agile regulatory frameworks, advanced free zones, and early public-private partnerships (e.g., G42 and Microsoft alliances) to position itself as the Middle East's premier commercial AI hub [2].\n\n| Metric / Feature | United Arab Emirates (UAE) | Saudi Arabia (KSA) |\n| --- | --- | --- |\n| Primary Sovereign AI Entities | G42, MGX, Core42 | SDAIA, NEOM, HUMAIN, PIF portfolio |\n| Est. Average Power Cost (USD/kWh) | $0.04 - $0.06 (Mixed grid & solar) | $0.03 - $0.05 (Highly subsidized fossil & solar) |\n| Key Government Subsidies | Tax exemptions, free zone privileges, compute grants | Direct equity injections, land grants, low-interest capital |\n| Strategic Focus | Commercial AI applications, global tech partnerships | Gigawatt-scale infrastructure, domestic talent, local localization |\n\n\n• Saudi Arabia's Vision 2030 drives giga-scale data center builds aiming for multi-gigawatt capacities, heavily subsidized by direct PIF funding and ultra-low domestic energy pricing [1].\n• The UAE focuses on high-efficiency, specialized sovereign large language models (such as Falcon) and agile partnerships with Western and Asian technology giants via entities like MGX and G42 [2].\n• Energy cost advantages in both nations give them a distinct edge over European and North American operators, though cooling demands in desert climates present ongoing engineering challenges [1].\n\n\nThe competitive dynamics of sovereign AI in the Arabian Gulf reflect a high-stakes race for technological self-reliance. In 2026, Saudi Arabia's approach is characterized by state-directed mega-projects where the Public Investment Fund absorbs early-stage capital expenditure risks, offering extremely low industrial electricity tariffs and land allocation within zones like NEOM and the Riyadh tech corridors. Conversely, the UAE relies on a mature financial ecosystem anchored by Abu Dhabi's MGX, which positions the emirate as both an infrastructure provider and a global investment player. Both countries face similar operational hurdles—primarily securing continuous allocations of advanced AI accelerators amidst global export controls, and managing the immense water and power footprints required for liquid-cooled server architectures.\n\n\n---\n### 🔗 Sources & Citations\n[1] [Middle East AI Infrastructure and Sovereign Strategies](https://www.csis.org/analysis/middle-east-ai-infrastructure)\n[2] [UAE and Saudi Arabia Sovereign AI Ecosystem Comparison](https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai-in-the-middle-east)"
+  },
+  {
+    "id": 7,
+    "category": "Executive Schedule (Availability & Focus Time)",
+    "prompt": "Look at my schedule for today and tell me if I have at least two continuous hours of free focus time before 6 PM.",
+    "passed": true,
+    "durationMs": 4268,
+    "type": "general",
+    "details": "Agent: undefined, Action: undefined",
+    "explanation": "Sai Keerthan, yes, you do have ample continuous focus time today—specifically, a solid block of over **5 hours** from **6:00 PM to 11:30 PM IST**, as well as the morning hours before **10:30 AM IST**.\n\nFor today, **Saturday, 19 Sept 2026**, your schedule includes two back-to-back team meetings:\n* **Team meeting**: **4:00 PM – 5:00 PM IST** (10:30 UTC – 11:30 UTC)\n* **Team meeting**: **5:00 PM – 6:00 PM IST** (11:30 UTC – 12:30 UTC)\n\nAside from those commitments, your afternoon and evening are completely open for uninterrupted deep work. Let me know if you would like me to block off any specific focus time on your calendar."
+  },
+  {
+    "id": 8,
+    "category": "Media Broadcast (YouTube Package Synthesis)",
+    "prompt": "I just recorded a deep-dive podcast on building multi-agent systems with Next.js and n8n. Generate 3 viral high-CTR titles, an SEO description with timestamps, and high-volume tags.",
+    "passed": true,
+    "durationMs": 5844,
+    "agent": "YOUTUBE",
+    "type": "action_stage",
+    "action": "upload",
+    "details": "Agent: YOUTUBE, Action: upload",
+    "explanation": "🎬 I've synthesized your video production assets. Please review and authorize release below:"
+  },
+  {
+    "id": 9,
+    "category": "Financial Ledger (Audit & Summary)",
+    "prompt": "How much have we spent so far on dining and travel expenses in our financial ledger, and what was our single largest transaction?",
+    "passed": true,
+    "durationMs": 4126,
+    "type": "general",
+    "details": "Agent: undefined, Action: undefined",
+    "explanation": "Sai, you have spent a total of **₹1,850** on dining and travel expenses—comprising **₹1,100** under Food & Dining and **₹750** under Transportation. \n\nRegarding your financial ledger as a whole, your single largest transaction overall was **₹1,00,002.36** paid to **SANJAY GHODAWAT UNIVERSITY** on **16 July 2026** under the Other category. Within your dining and travel expenses specifically, your highest individual transactions were **₹550** (for Zomato and Swiggy) and **₹750** for Uber India."
+  },
+  {
+    "id": 10,
+    "category": "Follow-up Modification (Dynamic Rescheduling)",
+    "prompt": "Can we reschedule that Tuesday 4:30 PM meeting to 6:00 PM instead?",
+    "passed": true,
+    "durationMs": 2027,
+    "agent": "CALENDAR",
+    "type": "action_stage",
+    "action": "schedule",
+    "details": "Agent: CALENDAR, Action: schedule, Type: action_stage",
+    "explanation": "📅 I've staged this reservation on your Executive Schedule. Please review and authorize below:"
+  }
+]
