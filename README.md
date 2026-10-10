@@ -1,15 +1,15 @@
-# Nexia — Autonomous AI Executive Assistant
+# Nexia — Executive Platform
 
 > **Field Project Submission**  
-> An enterprise-grade, multi-agent orchestration ecosystem built with **Next.js 16 (React 19)**, **Google Gemini**, and **n8n event-driven workflows**, featuring strict **Human-in-the-Loop (HITL)** safeguards and zero-conflict calendar intelligence.
+> An enterprise-grade, autonomous executive platform built with **Next.js 16 (React 19)**, **Google Gemini**, and **n8n event-driven workflows**, featuring strict **Human-in-the-Loop (HITL)** safeguards and zero-conflict calendar intelligence.
 
 ---
 
 ## 🌟 Executive Overview
 
-**Nexia** is a tech-forward autonomous AI executive assistant designed to eliminate the fragility of traditional conversational chatbots. Rather than acting as a simple text generator, Nexia executes deterministic, audited, and synchronized multi-step workflows across productivity, scheduling, and mobility domains.
+**Nexia** is a tech-forward executive productivity platform designed to eliminate the fragility of traditional conversational chatbots. Rather than acting as a simple text generator, Nexia executes deterministic, audited, and synchronized multi-step workflows across productivity, scheduling, and mobility domains.
 
-Built with a **Zero-Assumption Contract**, Nexia's frontend client never interacts directly with vulnerable third-party APIs. All interactions are routed through a resilient coordinator that synthesizes structured **Block-Based JSON UI schemas**, rendering interactive approval cards before executing critical mutations.
+Built with a **Zero-Assumption Contract**, Nexia's frontend client never interacts directly with vulnerable third-party APIs. All interactions are routed through a resilient coordinator that synthesizes structured **Block-Based JSON UI schemas**, rendering interactive approval cards before executing critical operations.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -25,7 +25,7 @@ Built with a **Zero-Assumption Contract**, Nexia's frontend client never interac
     ┌──────────────────────────────────────────────────────────┴─────────────┐
     │                 Next.js Central Orchestrator & Coordinator             │
     │  • Intent Extraction (Gemini)    • Defensive Schema Validation         │
-    │  • Multi-Agent Routing           • Failover Error Interceptor          │
+    │  • Service Routing               • Failover Error Interceptor          │
     └─────────────────┬──────────────────────────────────────────────────────┘
                       │
                       │ Authenticated HTTP Webhooks
@@ -33,7 +33,7 @@ Built with a **Zero-Assumption Contract**, Nexia's frontend client never interac
     ┌────────────────────────────────────────────────────────────────────────┐
     │                   n8n Event-Driven Orchestration Mesh                  │
     │                                                                        │
-    │  [📅 Calendar Agent]     [✉️ Gmail Agent]       [🚗 Mobility / Uber]   │
+    │  [📅 Calendar Engine]    [✉️ Communications]    [🚗 Mobility / Uber]   │
     │   • Zero-Conflict Guard   • HITL Email Drafting  • Live Deep-Linking   │
     │   • Temporal Resolution   • Smart Summarization  • Real-Time Fares     │
     │   • FreeBusy Slot Scanner                                              │
@@ -42,17 +42,17 @@ Built with a **Zero-Assumption Contract**, Nexia's frontend client never interac
 
 ---
 
-## ⚡ Core Capabilities & Agents
+## ⚡ Core Capabilities
 
-### 1. 📅 Calendar Agent & Temporal Engine
-- **Live Google Calendar Sync**: Real-time bidirectional synchronization with authoritative Google Calendar endpoints (eliminates ghost/zombie events).
+### 1. 📅 Calendar Engine & Temporal Intelligence
+- **Live Google Calendar Sync**: Real-time bidirectional synchronization with authoritative Google Calendar endpoints (eliminates ghost/stale events).
 - **Conflict & Buffer Calculator**: Scans day events to guarantee zero double-booking; flags overlaps with HTTP 409 conflict notifications.
 - **Natural Language Temporal Resolution**: Accurately resolves relative dates (*"tomorrow afternoon"*, *"next Monday at 10 AM"*) with strict timezone offset preservation (`Asia/Kolkata` / IANA).
 - **Parameter Disentanglement**: Decouples meeting summaries from agendas, descriptions, attendees, and locations.
 - **Freebusy Slot Scanner**: Automatically probes Google Calendar FreeBusy APIs to find the next available meeting window matching user duration.
 - **Recurring EXDATE Patcher**: Gracefully removes single occurrences of recurring meeting series without altering parent recurrence rules.
 
-### 2. ✉️ Gmail & Communications Agent
+### 2. ✉️ Email & Communications Engine
 - **Human-in-the-Loop (HITL) Drafting**: Generates contextually grounded email drafts and presents interactive approval staging cards before dispatching.
 - **Smart Inbox Triage**: Categorizes priority emails, action items, and follow-ups.
 
@@ -88,8 +88,8 @@ Built with a **Zero-Assumption Contract**, Nexia's frontend client never interac
 ### 2. Installation
 ```bash
 # Clone the repository
-git clone https://github.com/saikeerthanmedisetty/omni-agent.git
-cd omni-agent
+git clone https://github.com/saikeerthanmedisetty/nexia.git
+cd nexia
 
 # Install dependencies
 npm install
@@ -109,19 +109,19 @@ N8N_CALENDAR_WEBHOOK_URL=https://workflow.ccbp.in/webhook/...
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) to access the Nexia interface and executive dashboard.
+Open [http://localhost:3000](http://localhost:3000) to access the Nexia executive dashboard.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-omni-agent/
+nexia/
 ├── src/
 │   ├── app/
-│   │   ├── api/            # Next.js API route handlers (chat, calendar, agents, auth)
+│   │   ├── api/            # Next.js API route handlers (chat, calendar, auth)
 │   │   ├── dashboard/      # Executive calendar, tasks, and analytics dashboard
-│   │   ├── chat/           # Conversational agent interface
+│   │   ├── chat/           # Interactive executive command center
 │   │   └── page.tsx        # Landing and portal entrypoint
 │   ├── components/
 │   │   ├── chat/           # HITLCard, MessageItem, ChatInterface
@@ -140,6 +140,6 @@ omni-agent/
 ---
 
 ## 👥 Authors & Team
-- **Project**: Nexia Omni-Agent (Field Project)
+- **Project**: Nexia Executive Platform (Field Project)
 - **Institution**: SGU
 - **Lead Developer**: Sai Keerthan Medisetty (`saikeerthanmedisetty686@gmail.com`)
