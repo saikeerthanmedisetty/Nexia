@@ -97,9 +97,32 @@ export async function saveTokens(tokens: GoogleTokenData): Promise<void> {
 }
 
 /**
- * Synchronously retrieves saved tokens from local cache
+ * Synchronously retrieves saved tokens from environment variables (Priority 1 for Vercel/Cloud)
+ * or local disk cache
  */
 export function getSavedTokensSync(): GoogleTokenData | null {
+  // 1. Check environment variable token configuration (24/7 serverless cloud priority)
+  if (process.env.GOOGLE_REFRESH_TOKEN) {
+    return {
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+      access_token: process.env.GOOGLE_ACCESS_TOKEN || null,
+      userEmail: process.env.GOOGLE_USER_EMAIL || 'saikeerthanmedisetty686@gmail.com',
+      userName: process.env.GOOGLE_USER_NAME || 'Sai Keerthan',
+      token_type: 'Bearer',
+      connectedAt: new Date().toISOString(),
+    };
+  }
+
+  if (process.env.GOOGLE_TOKENS_JSON) {
+    try {
+      const parsed = JSON.parse(process.env.GOOGLE_TOKENS_JSON);
+      if (parsed && (parsed.refresh_token || parsed.access_token)) {
+        return parsed;
+      }
+    } catch {}
+  }
+
+  // 2. Fallback to local cache file
   try {
     if (fs.existsSync(TOKEN_CACHE_FILE)) {
       const data = fs.readFileSync(TOKEN_CACHE_FILE, 'utf-8');
@@ -114,10 +137,16 @@ export function getSavedTokensSync(): GoogleTokenData | null {
 }
 
 /**
- * Asynchronously retrieves saved tokens (MongoDB Atlas first, with local disk fallback)
+ * Asynchronously retrieves saved tokens (Environment variables first, MongoDB Atlas second, with local disk fallback)
  */
 export async function getSavedTokens(): Promise<GoogleTokenData | null> {
-  // Try MongoDB Atlas
+  // 1. Direct environment variable check
+  const envTokens = getSavedTokensSync();
+  if (envTokens?.refresh_token) {
+    return envTokens;
+  }
+
+  // 2. Try MongoDB Atlas
   try {
     const record = await executeMongoOperation(async (db: any) => {
       return db.collection('google_tokens').findOne({ id: 'primary_google_account' });
@@ -129,7 +158,7 @@ export async function getSavedTokens(): Promise<GoogleTokenData | null> {
     console.warn('[Google Auth] MongoDB fetch tokens notice:', err?.message);
   }
 
-  // Fallback to local cache
+  // 3. Fallback to local cache
   return getSavedTokensSync();
 }
 
