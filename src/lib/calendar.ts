@@ -974,6 +974,101 @@ export async function checkAvailability(params: {
 }
 
 /**
+ * Seeds realistic executive calendar events for demonstration and reviewer exploration
+ * when no real Google Calendar account is connected.
+ */
+export function seedDefaultExecutiveEvents() {
+  const todayStr = getISTDateString(new Date());
+  const tom = new Date();
+  tom.setDate(tom.getDate() + 1);
+  const tomorrowStr = getISTDateString(tom);
+
+  const demoEvents: CalendarEvent[] = [
+    {
+      id: 'demo-1',
+      title: 'Executive Strategy & Architecture Alignment',
+      description: 'Reviewing cross-functional priorities and technical roadmap.',
+      startTime: new Date(`${todayStr}T09:30:00+05:30`).toISOString(),
+      endTime: new Date(`${todayStr}T10:30:00+05:30`).toISOString(),
+      date: todayStr,
+      durationMinutes: 60,
+      durationFormatted: '1h',
+      location: 'Google Meet',
+      meetUrl: 'https://meet.google.com/nex-arch-sync',
+      attendees: ['lead@nexia.ai', 'saikeerthanmedisetty686@gmail.com'],
+      type: 'meeting',
+      status: 'confirmed',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'demo-2',
+      title: 'Product Design & User Workflow Review',
+      description: 'Examining interactive components and Human-in-the-Loop staging.',
+      startTime: new Date(`${todayStr}T13:00:00+05:30`).toISOString(),
+      endTime: new Date(`${todayStr}T13:45:00+05:30`).toISOString(),
+      date: todayStr,
+      durationMinutes: 45,
+      durationFormatted: '45m',
+      location: 'Executive Boardroom',
+      attendees: ['design@nexia.ai'],
+      type: 'review',
+      status: 'confirmed',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'demo-3',
+      title: 'Field Project Demonstration',
+      description: 'Live presentation of Nexia platform features and system integration.',
+      startTime: new Date(`${todayStr}T15:30:00+05:30`).toISOString(),
+      endTime: new Date(`${todayStr}T16:30:00+05:30`).toISOString(),
+      date: todayStr,
+      durationMinutes: 60,
+      durationFormatted: '1h',
+      location: 'SGU Auditorium',
+      attendees: ['panel@sgu.edu', 'saikeerthanmedisetty686@gmail.com'],
+      type: 'meeting',
+      status: 'confirmed',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'demo-4',
+      title: 'Engineering Sprint Planning',
+      description: 'Bi-weekly sprint backlog refinement and performance audit.',
+      startTime: new Date(`${tomorrowStr}T10:00:00+05:30`).toISOString(),
+      endTime: new Date(`${tomorrowStr}T11:00:00+05:30`).toISOString(),
+      date: tomorrowStr,
+      durationMinutes: 60,
+      durationFormatted: '1h',
+      location: 'Google Meet',
+      meetUrl: 'https://meet.google.com/eng-sprint-sync',
+      attendees: ['dev-team@nexia.ai'],
+      type: 'focus',
+      status: 'confirmed',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'demo-5',
+      title: 'Q4 Leadership Briefing',
+      description: 'Strategic review with stakeholders and division heads.',
+      startTime: new Date(`${tomorrowStr}T14:30:00+05:30`).toISOString(),
+      endTime: new Date(`${tomorrowStr}T15:30:00+05:30`).toISOString(),
+      date: tomorrowStr,
+      durationMinutes: 60,
+      durationFormatted: '1h',
+      location: 'Conference Room B',
+      attendees: ['leadership@nexia.ai'],
+      type: 'meeting',
+      status: 'confirmed',
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
+  for (const ev of demoEvents) {
+    inMemoryEvents.set(ev.id, ev);
+  }
+}
+
+/**
  * Retrieve calendar events with automatic sync from MongoDB Atlas and Google Calendar
  */
 export async function getCalendarEvents(options?: {
@@ -1051,7 +1146,12 @@ export async function getCalendarEvents(options?: {
   dat.setDate(dat.getDate() + 2);
   const dayAfterTomorrowStr = getISTDateString(dat);
 
-  const allEvents = deduplicateEvents(Array.from(inMemoryEvents.values()), isGoogleActive);
+  let allEvents = deduplicateEvents(Array.from(inMemoryEvents.values()), isGoogleActive);
+
+  if (allEvents.length === 0 && !isGoogleActive) {
+    seedDefaultExecutiveEvents();
+    allEvents = deduplicateEvents(Array.from(inMemoryEvents.values()), isGoogleActive);
+  }
 
   if (resolvedOptions?.date) {
     return allEvents.filter((e) => e.date === resolvedOptions.date);

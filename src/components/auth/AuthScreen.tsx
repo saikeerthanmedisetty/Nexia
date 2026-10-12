@@ -306,6 +306,22 @@ export function AuthScreen() {
                   </>
                 )}
               </button>
+
+              {mode === "login" && (
+                <button
+                  type="button"
+                  onClick={() => handleLogin("saikeerthanmedisetty686@gmail.com", "Sai@2007", true)}
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl
+                             border border-indigo-500/30 bg-indigo-500/10 py-2.5 text-xs font-medium text-indigo-300
+                             hover:bg-indigo-500/20 hover:text-indigo-200 active:scale-[0.98]
+                             disabled:opacity-50 disabled:cursor-not-allowed
+                             transition-all cursor-pointer mt-1"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                  <span>⚡ One-Click Examiner / Demo Access</span>
+                </button>
+              )}
             </form>
           )}
 
