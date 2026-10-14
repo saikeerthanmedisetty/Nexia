@@ -13,7 +13,20 @@ export async function GET() {
       });
     }
 
-    // Try fetching YouTube stats & unread email count
+    // Service Account mode: permanent 24/7 Google Calendar sync
+    if (status.isServiceAccount) {
+      return NextResponse.json({
+        connected: true,
+        email: status.email,
+        name: status.name,
+        connectedAt: status.connectedAt,
+        youtube: null,
+        unreadEmails: 0,
+        isServiceAccount: true,
+      });
+    }
+
+    // Try fetching YouTube stats & unread email count (OAuth user mode)
     let youtube = null;
     let unreadEmails = 0;
 

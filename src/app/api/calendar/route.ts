@@ -38,6 +38,13 @@ export async function GET(req: Request) {
 
     // Sync with real Google Calendar if connected (Google Calendar is the single source of truth)
     const googleStatus = await isGoogleConnected();
+    const syncDebug = {
+      connected: googleStatus.connected,
+      isServiceAccount: (googleStatus as any).isServiceAccount || false,
+      error: null as string | null,
+      gcalCount: 0,
+    };
+
     if (googleStatus.connected) {
       try {
         let timeMin: string | undefined;
@@ -49,6 +56,7 @@ export async function GET(req: Request) {
         }
         const gcalEvents = await listGoogleCalendarEvents(timeMin ? { timeMin, timeMax } : undefined);
         const activeGcal = (gcalEvents || []).filter((e: any) => e.status !== 'cancelled');
+        syncDebug.gcalCount = activeGcal.length;
 
         // Also keep any freshly created local events (within last 3 minutes) that might still be syncing
         const nowMs = Date.now();
@@ -77,6 +85,7 @@ export async function GET(req: Request) {
         events = filtered;
       } catch (gcalErr: any) {
         console.warn('[Calendar API] Google Calendar sync notice:', gcalErr?.message);
+        syncDebug.error = gcalErr?.message || String(gcalErr);
       }
     }
 
@@ -101,6 +110,7 @@ export async function GET(req: Request) {
         totalMeetingMinutes: analysis.totalMeetingMinutes,
         conflictCount: analysis.conflicts.length,
       },
+      syncDebug,
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
