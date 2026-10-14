@@ -11,7 +11,7 @@ import {
   getISTDateString,
 } from '@/lib/calendar';
 import { recordTask } from '@/lib/tasks';
-import { isGoogleConnected } from '@/lib/google/auth';
+import { isGoogleConnected, serviceAccountDiagnostics } from '@/lib/google/auth';
 import { listGoogleCalendarEvents, createGoogleCalendarEvent, deleteGoogleCalendarEvent } from '@/lib/google/calendar';
 
 export async function GET(req: Request) {
@@ -43,6 +43,7 @@ export async function GET(req: Request) {
       isServiceAccount: (googleStatus as any).isServiceAccount || false,
       error: null as string | null,
       gcalCount: 0,
+      serviceAccountDiagnostics,
     };
 
     if (googleStatus.connected) {

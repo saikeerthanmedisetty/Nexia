@@ -173,26 +173,50 @@ export interface ServiceAccountCredentials {
   token_uri?: string;
 }
 
+export let serviceAccountDiagnostics: {
+  envFound: boolean;
+  envLength: number;
+  keysFound: string[];
+  error: string | null;
+} = {
+  envFound: false,
+  envLength: 0,
+  keysFound: [],
+  error: null,
+};
+
 /**
  * Parses and returns Google Cloud Service Account credentials if configured
  */
 export function getServiceAccountCredentials(): ServiceAccountCredentials | null {
+  serviceAccountDiagnostics.envFound = !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  serviceAccountDiagnostics.envLength = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.length || 0;
+
   // 1. From environment variable (Vercel & .env.local)
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON.trim();
     // Try standard JSON.parse first
     try {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.client_email && parsed.private_key) {
-        return parsed as ServiceAccountCredentials;
+      if (parsed) {
+        serviceAccountDiagnostics.keysFound = Object.keys(parsed);
+        if (parsed.client_email && parsed.private_key) {
+          serviceAccountDiagnostics.error = null;
+          return parsed as ServiceAccountCredentials;
+        } else {
+          serviceAccountDiagnostics.error = 'client_email or private_key missing in parsed JSON';
+        }
       }
-    } catch {}
+    } catch (e: any) {
+      serviceAccountDiagnostics.error = 'JSON.parse: ' + e?.message;
+    }
 
     // Try unquoting outer quotes if wrapped
     try {
       if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
         const parsed = JSON.parse(raw.slice(1, -1));
         if (parsed && parsed.client_email && parsed.private_key) {
+          serviceAccountDiagnostics.error = null;
           return parsed as ServiceAccountCredentials;
         }
       }
@@ -202,12 +226,19 @@ export function getServiceAccountCredentials(): ServiceAccountCredentials | null
     try {
       const fn = new Function('return (' + raw + ');');
       const parsed = fn();
-      if (parsed && parsed.client_email && parsed.private_key) {
-        return parsed as ServiceAccountCredentials;
+      if (parsed) {
+        serviceAccountDiagnostics.keysFound = Object.keys(parsed);
+        if (parsed.client_email && parsed.private_key) {
+          serviceAccountDiagnostics.error = null;
+          return parsed as ServiceAccountCredentials;
+        }
       }
     } catch (err: any) {
+      serviceAccountDiagnostics.error = (serviceAccountDiagnostics.error || '') + ' | JS obj: ' + err?.message;
       console.warn('[Google Auth] Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:', err?.message);
     }
+  } else {
+    serviceAccountDiagnostics.error = 'GOOGLE_SERVICE_ACCOUNT_JSON is undefined in process.env';
   }
 
   // 2. From service-account.json disk fallback
