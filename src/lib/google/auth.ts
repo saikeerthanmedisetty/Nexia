@@ -179,12 +179,29 @@ export interface ServiceAccountCredentials {
 export function getServiceAccountCredentials(): ServiceAccountCredentials | null {
   // 1. From environment variable (Vercel & .env.local)
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON.trim();
+    // Try standard JSON.parse first
     try {
-      const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON.trim();
-      const unquoted = (raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))
-        ? raw.slice(1, -1)
-        : raw;
-      const parsed = JSON.parse(unquoted);
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.client_email && parsed.private_key) {
+        return parsed as ServiceAccountCredentials;
+      }
+    } catch {}
+
+    // Try unquoting outer quotes if wrapped
+    try {
+      if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
+        const parsed = JSON.parse(raw.slice(1, -1));
+        if (parsed && parsed.client_email && parsed.private_key) {
+          return parsed as ServiceAccountCredentials;
+        }
+      }
+    } catch {}
+
+    // Fallback: Parse as JavaScript Object literal (handles single quotes or unquoted keys)
+    try {
+      const fn = new Function('return (' + raw + ');');
+      const parsed = fn();
       if (parsed && parsed.client_email && parsed.private_key) {
         return parsed as ServiceAccountCredentials;
       }
