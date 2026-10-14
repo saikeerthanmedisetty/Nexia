@@ -162,11 +162,68 @@ export async function getSavedTokens(): Promise<GoogleTokenData | null> {
   return getSavedTokensSync();
 }
 
+export interface ServiceAccountCredentials {
+  type: string;
+  project_id: string;
+  private_key_id: string;
+  private_key: string;
+  client_email: string;
+  client_id?: string;
+  auth_uri?: string;
+  token_uri?: string;
+}
+
 /**
- * Returns an authenticated Google OAuth2 Client ready for API calls,
+ * Parses and returns Google Cloud Service Account credentials if configured
+ */
+export function getServiceAccountCredentials(): ServiceAccountCredentials | null {
+  // 1. From environment variable (Vercel & .env.local)
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    try {
+      const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON.trim();
+      const unquoted = (raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))
+        ? raw.slice(1, -1)
+        : raw;
+      const parsed = JSON.parse(unquoted);
+      if (parsed && parsed.client_email && parsed.private_key) {
+        return parsed as ServiceAccountCredentials;
+      }
+    } catch (err: any) {
+      console.warn('[Google Auth] Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:', err?.message);
+    }
+  }
+
+  // 2. From service-account.json disk fallback
+  try {
+    const serviceAccountFile = path.join(process.cwd(), 'service-account.json');
+    if (fs.existsSync(serviceAccountFile)) {
+      const data = fs.readFileSync(serviceAccountFile, 'utf-8');
+      const parsed = JSON.parse(data);
+      if (parsed && parsed.client_email && parsed.private_key) {
+        return parsed as ServiceAccountCredentials;
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
+ * Returns an authenticated Google Auth Client (Service Account or OAuth2) ready for API calls,
  * with automatic token auto-refresh listener attached.
  */
-export async function getAuthenticatedClient() {
+export async function getAuthenticatedClient(): Promise<any> {
+  // 1. Priority 1: Service Account (Permanent 24/7 Enterprise Key)
+  const serviceAccount = getServiceAccountCredentials();
+  if (serviceAccount) {
+    return new google.auth.JWT({
+      email: serviceAccount.client_email,
+      key: serviceAccount.private_key.replace(/\\n/g, '\n'),
+      scopes: GOOGLE_SCOPES,
+    });
+  }
+
+  // 2. Priority 2: Saved OAuth Tokens
   const tokens = await getSavedTokens();
   if (!tokens || (!tokens.refresh_token && !tokens.access_token)) {
     return null;
@@ -195,7 +252,21 @@ export async function isGoogleConnected(): Promise<{
   email?: string;
   name?: string;
   connectedAt?: string;
+  isServiceAccount?: boolean;
 }> {
+  // 1. Check Service Account first (Permanent 24/7)
+  const serviceAccount = getServiceAccountCredentials();
+  if (serviceAccount) {
+    return {
+      connected: true,
+      email: process.env.GOOGLE_CALENDAR_ID || 'saikeerthanmedisetty686@gmail.com',
+      name: 'Nexia Workspace (Service Account)',
+      connectedAt: 'Permanent 24/7',
+      isServiceAccount: true,
+    };
+  }
+
+  // 2. Fallback to OAuth tokens
   const tokens = await getSavedTokens();
   if (!tokens || (!tokens.refresh_token && !tokens.access_token)) {
     return { connected: false };
@@ -206,6 +277,7 @@ export async function isGoogleConnected(): Promise<{
     email: tokens.userEmail || 'saikeerthanmedisetty686@gmail.com',
     name: tokens.userName || 'Sai Keerthan',
     connectedAt: tokens.connectedAt,
+    isServiceAccount: false,
   };
 }
 

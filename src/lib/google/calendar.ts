@@ -4,6 +4,13 @@ import type { CalendarEvent } from '../calendar';
 import { getISTDateString, formatToISTTime } from '../utils';
 
 /**
+ * Target Calendar ID — uses the authorized executive calendar ID for Service Accounts & OAuth
+ */
+export function getTargetCalendarId(): string {
+  return process.env.GOOGLE_CALENDAR_ID || 'saikeerthanmedisetty686@gmail.com';
+}
+
+/**
  * Query Google Calendar Freebusy API — used for FIND_SLOT operations
  */
 export async function queryGoogleCalendarFreebusy(params: {
@@ -14,7 +21,8 @@ export async function queryGoogleCalendarFreebusy(params: {
   const auth = await getAuthenticatedClient();
   if (!auth) throw new Error('Google Workspace is not authenticated.');
   const calendar = google.calendar({ version: 'v3', auth });
-  const items = (params.calendarIds || ['primary']).map(id => ({ id }));
+  const targetId = getTargetCalendarId();
+  const items = (params.calendarIds || [targetId]).map(id => ({ id }));
   const res = await calendar.freebusy.query({
     requestBody: {
       timeMin: params.timeMin,
@@ -43,7 +51,7 @@ export async function patchGoogleCalendarRecurrence(
   if (!auth) throw new Error('Google Workspace is not authenticated.');
   const calendar = google.calendar({ version: 'v3', auth });
   await calendar.events.patch({
-    calendarId: 'primary',
+    calendarId: getTargetCalendarId(),
     eventId,
     requestBody: { recurrence },
   });
@@ -69,7 +77,7 @@ export async function listGoogleCalendarEvents(options?: {
   const defaultMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30).toISOString();
 
   const res = await calendar.events.list({
-    calendarId: 'primary',
+    calendarId: getTargetCalendarId(),
     timeMin: options?.timeMin || defaultMin,
     timeMax: options?.timeMax || defaultMax,
     singleEvents: true,
@@ -192,7 +200,7 @@ export async function createGoogleCalendarEvent(params: {
   };
 
   const res = await calendar.events.insert({
-    calendarId: 'primary',
+    calendarId: getTargetCalendarId(),
     requestBody,
     conferenceDataVersion: 1,
   });
@@ -229,7 +237,7 @@ export async function deleteGoogleCalendarEvent(eventId: string): Promise<boolea
 
   const calendar = google.calendar({ version: 'v3', auth });
   await calendar.events.delete({
-    calendarId: 'primary',
+    calendarId: getTargetCalendarId(),
     eventId,
   });
 
@@ -284,7 +292,7 @@ export async function updateGoogleCalendarEvent(
   }
 
   const res = await calendar.events.patch({
-    calendarId: 'primary',
+    calendarId: getTargetCalendarId(),
     eventId,
     requestBody: patchBody,
   });

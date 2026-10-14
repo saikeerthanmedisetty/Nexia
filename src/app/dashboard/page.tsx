@@ -47,7 +47,7 @@ import { ExecutiveDatePicker } from "@/components/dashboard/ExecutiveDatePicker"
 export default function ExecutiveDashboardPage() {
   const { user, handleLogout } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'today' | 'tomorrow' | 'custom'>('today');
+  const [selectedTab, setSelectedTab] = useState<'today' | 'tomorrow' | 'upcoming' | 'custom'>('today');
   const [customDate, setCustomDate] = useState<string>(() => getISTDateString());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
@@ -72,6 +72,7 @@ export default function ExecutiveDashboardPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [freeBlocks, setFreeBlocks] = useState<FreeBlock[]>([]);
   const [conflicts, setConflicts] = useState<ConflictAlert[]>([]);
+  const [calendarMetrics, setCalendarMetrics] = useState({ todayCount: 0, tomorrowCount: 0, upcomingCount: 0 });
   const [tasks, setTasks] = useState<AgentTaskRecord[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<AgentTaskRecord[]>([]);
   const [weeklyBurn, setWeeklyBurn] = useState<number>(0);
@@ -132,7 +133,6 @@ export default function ExecutiveDashboardPage() {
   // Fetch all live dashboard data concurrently
   const fetchDashboardData = useCallback(async (quiet = false) => {
     if (!quiet) setIsLoading(true);
-    else setIsRefreshing(true);
 
     try {
       // 1. Fetch Calendar Events, Free Blocks & Conflicts
@@ -146,6 +146,9 @@ export default function ExecutiveDashboardPage() {
           setEvents(calData.events || []);
           setFreeBlocks(calData.freeBlocks || []);
           setConflicts(calData.conflicts || []);
+          if (calData.metrics) {
+            setCalendarMetrics(calData.metrics);
+          }
         }
       }
 
@@ -655,11 +658,11 @@ export default function ExecutiveDashboardPage() {
                   </div>
                 </div>
                 <div className="mt-2.5 flex items-baseline space-x-2">
-                  <span className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-mono">{todayMeetings.length}</span>
+                  <span className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-mono">{calendarMetrics.todayCount || todayMeetings.length}</span>
                   <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono">scheduled</span>
                 </div>
                 <div className="mt-2 text-[11px] text-slate-500 dark:text-zinc-400 font-mono flex items-center justify-between">
-                  <span>Tomorrow: <strong className="text-slate-900 dark:text-white">{tomorrowMeetings.length}</strong></span>
+                  <span>Tomorrow: <strong className="text-slate-900 dark:text-white">{calendarMetrics.tomorrowCount || tomorrowMeetings.length}</strong></span>
                   {conflicts.length > 0 && (
                     <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center space-x-0.5">
                       <AlertTriangle size={11} />
@@ -813,6 +816,21 @@ export default function ExecutiveDashboardPage() {
                           )}
                         >
                           Tomorrow
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTab('upcoming');
+                            setIsDatePickerOpen(false);
+                          }}
+                          className={cn(
+                            "px-3 py-1 rounded-lg transition-all cursor-pointer",
+                            selectedTab === 'upcoming'
+                              ? "bg-indigo-600 text-white font-bold shadow-xs"
+                              : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+                          )}
+                        >
+                          Upcoming
                         </button>
                         <button
                           type="button"

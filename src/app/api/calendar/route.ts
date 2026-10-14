@@ -34,6 +34,7 @@ export async function GET(req: Request) {
     const tomorrowStr = getISTDateString(tomDate);
 
     let events = await getCalendarEvents({ range, date });
+    let allAvailableEvents: any[] = events;
 
     // Sync with real Google Calendar if connected (Google Calendar is the single source of truth)
     const googleStatus = await isGoogleConnected();
@@ -57,26 +58,34 @@ export async function GET(req: Request) {
           (nowMs - new Date(e.createdAt || 0).getTime() < 180_000)
         );
 
-        let merged = [...activeGcal, ...pendingLocal].sort(
+        const allAvailable = [...activeGcal, ...pendingLocal].sort(
           (a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
         );
 
+        allAvailableEvents = allAvailable;
+
+        let filtered = allAvailable;
         if (date) {
-          merged = merged.filter((e: any) => e.date === date);
+          filtered = allAvailable.filter((e: any) => e.date === date);
         } else if (range === 'today') {
-          merged = merged.filter((e: any) => e.date === todayStr);
+          filtered = allAvailable.filter((e: any) => e.date === todayStr);
         } else if (range === 'tomorrow') {
-          merged = merged.filter((e: any) => e.date === tomorrowStr);
+          filtered = allAvailable.filter((e: any) => e.date === tomorrowStr);
+        } else if (range === 'upcoming') {
+          filtered = allAvailable.filter((e: any) => e.date >= todayStr);
         }
-        events = merged;
+        events = filtered;
       } catch (gcalErr: any) {
         console.warn('[Calendar API] Google Calendar sync notice:', gcalErr?.message);
       }
     }
 
     const analysis = calculateFreeTimeAndConflicts(events, targetDateStr);
-    const todayEvents = events.filter((e) => e.date === todayStr);
-    const tomorrowEvents = events.filter((e) => e.date === tomorrowStr);
+    
+    // Always compute metrics across all active events so Tomorrow & Upcoming counts are accurate
+    const todayEvents = allAvailableEvents.filter((e) => e.date === todayStr);
+    const tomorrowEvents = allAvailableEvents.filter((e) => e.date === tomorrowStr);
+    const upcomingEvents = allAvailableEvents.filter((e) => e.date >= todayStr);
 
     return NextResponse.json({
       success: true,
@@ -87,6 +96,7 @@ export async function GET(req: Request) {
       metrics: {
         todayCount: todayEvents.length,
         tomorrowCount: tomorrowEvents.length,
+        upcomingCount: upcomingEvents.length,
         totalFreeMinutes: analysis.totalFreeMinutes,
         totalMeetingMinutes: analysis.totalMeetingMinutes,
         conflictCount: analysis.conflicts.length,
