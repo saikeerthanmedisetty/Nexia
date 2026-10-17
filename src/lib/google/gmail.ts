@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { getAuthenticatedClient } from './auth';
+import { getGmailAuthClient } from './auth';
 
 export interface GmailMessageSummary {
   id: string;
@@ -68,7 +68,7 @@ export const FALLBACK_EXECUTIVE_EMAILS: GmailMessageSummary[] = [
  */
 export async function getGmailUnreadCount(): Promise<number> {
   try {
-    const auth = await getAuthenticatedClient();
+    const auth = await getGmailAuthClient();
     if (auth) {
       const gmail = google.gmail({ version: 'v1', auth });
       const res = await gmail.users.labels.get({
@@ -92,7 +92,7 @@ export async function getGmailUnreadCount(): Promise<number> {
  */
 export async function listRecentEmails(maxResults = 10): Promise<GmailMessageSummary[]> {
   try {
-    const auth = await getAuthenticatedClient();
+    const auth = await getGmailAuthClient();
     if (auth) {
       const gmail = google.gmail({ version: 'v1', auth });
       const listRes = await gmail.users.messages.list({
@@ -159,7 +159,7 @@ export interface SendGmailParams {
  */
 export async function sendGmailMessage(params: SendGmailParams): Promise<{ success: boolean; messageId?: string; threadId?: string }> {
   try {
-    const auth = await getAuthenticatedClient();
+    const auth = await getGmailAuthClient();
     if (auth) {
       const gmail = google.gmail({ version: 'v1', auth });
       const senderName = params.fromName || 'Sai Keerthan (via Nexia)';

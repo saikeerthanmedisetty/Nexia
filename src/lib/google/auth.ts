@@ -329,6 +329,34 @@ export async function getAuthenticatedClient(): Promise<any> {
 }
 
 /**
+ * Returns an authenticated Google Auth Client specifically optimized for Gmail.
+ * Priority 1: User OAuth2 Tokens (since personal mailboxes strictly require user consent).
+ * Priority 2: Service Account (fallback for enterprise workspace domains).
+ */
+export async function getGmailAuthClient(): Promise<any> {
+  // 1. Priority 1 for Gmail: Saved User OAuth Tokens
+  const tokens = await getSavedTokens();
+  if (tokens && (tokens.refresh_token || tokens.access_token)) {
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials(tokens);
+
+    oauth2Client.on('tokens', async (newTokens) => {
+      console.log('[Google Auth] Gmail OAuth tokens refreshed automatically.');
+      await saveTokens({
+        ...newTokens,
+        refresh_token: newTokens.refresh_token || tokens.refresh_token,
+      });
+    });
+
+    return oauth2Client;
+  }
+
+  // 2. Priority 2: Service Account
+  return getAuthenticatedClient();
+}
+
+
+/**
  * Checks whether Google Workspace is connected and authenticated
  */
 export async function isGoogleConnected(): Promise<{
