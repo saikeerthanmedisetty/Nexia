@@ -15,11 +15,11 @@ import {
   findMatchingCalendarEvent,
 } from './calendar';
 import { recordTask } from './tasks';
-import { isGoogleConnected } from './google/auth';
+import { isGoogleConnected, isYouTubeOAuthConnected } from './google/auth';
 import { sendGmailMessage, listRecentEmails, getGmailUnreadCount } from './google/gmail';
 import { appendSpreadsheetExpense, getSpreadsheetExpenses, setExpenseSpreadsheetId, syncPendingExpensesToSpreadsheet, extractSpreadsheetId } from './google/sheets';
 import { createGoogleCalendarEvent, deleteGoogleCalendarEvent, updateGoogleCalendarEvent, queryGoogleCalendarFreebusy, patchGoogleCalendarRecurrence, listGoogleCalendarEvents } from './google/calendar';
-import { getChannelStats, listChannelVideos, uploadYouTubeVideoMetadata } from './google/youtube';
+import { getChannelStats, listChannelVideos, uploadYouTubeVideoMetadata, uploadVideoToYouTube } from './google/youtube';
 import { generateFinancialStatement } from './finance';
 
 export interface AgentConfig {
@@ -471,6 +471,64 @@ function parseMeetingParams(params: AgentExecutionParams) {
     }
 
     if (act.includes('upload') || act.includes('publish')) {
+      let videoBuffer: Buffer | null = null;
+      let videoMimeType = params.videoMimeType || 'video/mp4';
+
+      if (params.videoData) {
+        try {
+          const b64 = params.videoData.includes(',') ? params.videoData.split(',')[1] : params.videoData;
+          videoBuffer = Buffer.from(b64, 'base64');
+        } catch {}
+      } else if (params.videoUrl || (params.url && !params.url.includes('youtu'))) {
+        const targetUrl = params.videoUrl || params.url;
+        try {
+          const fetchRes = await fetch(targetUrl);
+          if (fetchRes.ok) {
+            videoBuffer = Buffer.from(await fetchRes.arrayBuffer());
+            videoMimeType = fetchRes.headers.get('content-type') || videoMimeType;
+          }
+        } catch {}
+      }
+
+      const hasOAuth = await isYouTubeOAuthConnected();
+      if (videoBuffer && hasOAuth) {
+        try {
+          const uploadRes = await uploadVideoToYouTube({
+            title: params.title || params.selected_title || 'Nexia Executive Presentation',
+            description: params.description || params.seo_description || 'Uploaded via Nexia Autonomous Platform',
+            tags: params.tags || ['Nexia', 'AutonomousAgents', 'AI', 'Demo'],
+            privacyStatus: params.privacyStatus || 'unlisted',
+            videoBuffer,
+            videoMimeType,
+          });
+
+          if (uploadRes.success && uploadRes.videoId) {
+            await recordTask({
+              agentId: 'YOUTUBE',
+              action: 'upload',
+              title: `Uploaded: ${params.title || params.selected_title || 'Video'}`,
+              status: 'completed',
+              details: `Uploaded to channel ${uploadRes.channelTitle || '@SaikeerthanMedisetty'}. Watch: ${uploadRes.videoUrl}`,
+              durationMs: 950,
+              params: { title: params.title, privacyStatus: params.privacyStatus },
+              result: uploadRes,
+            });
+
+            return {
+              success: true,
+              data: {
+                status: 'success',
+                ...uploadRes,
+                message: `🎬 **Video Uploaded & Live on YouTube!**\n\n• **Title:** ${params.title || params.selected_title || 'Video'}\n• **Channel:** ${uploadRes.channelTitle || '@SaikeerthanMedisetty'}\n• **Privacy:** ${params.privacyStatus || 'unlisted'}\n• **Direct Link:** [Watch on YouTube](${uploadRes.videoUrl}) ✅`,
+              },
+            };
+          }
+        } catch (vidErr: any) {
+          console.warn('[agents.ts] uploadVideoToYouTube error:', vidErr?.message);
+        }
+      }
+
+      // Fallback metadata upload
       if (googleStatus.connected) {
         try {
           const uploadRes = await uploadYouTubeVideoMetadata({

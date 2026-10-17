@@ -18,7 +18,12 @@ export async function GET(req: Request) {
       return NextResponse.redirect(new URL('/dashboard?error=missing_code', req.url));
     }
 
-    const oauth2Client = getOAuth2Client();
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || new URL(req.url).host;
+    const proto = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const origin = `${proto}://${host}`;
+    const redirectUri = `${origin}/api/auth/google/callback`;
+
+    const oauth2Client = getOAuth2Client(redirectUri);
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 

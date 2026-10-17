@@ -112,11 +112,21 @@ export async function POST(req: Request) {
       crossSessionMemory
     );
 
-    // Preserve video binary payload if video attached
-    if (image && image.isVideo && intent.params) {
+    // Preserve video binary payload if video attached and store to Cloudinary for cloud resilience
+    if (image && image.isVideo) {
+      if (!intent.params) intent.params = {};
       intent.params.videoData = image.data;
       intent.params.videoFileName = image.name;
       intent.params.videoMimeType = image.mimeType;
+
+      try {
+        const cldRes = await uploadToCloudinary(image.data, 'nexia/videos', { filename: image.name });
+        if (cldRes.success && cldRes.url) {
+          intent.params.videoUrl = cldRes.url;
+        }
+      } catch (cldErr) {
+        console.warn('Notice uploading video to Cloudinary:', cldErr);
+      }
     }
 
     // ─── 4. Agent Actions (Staging, Updating, Confirming, Cancelling) ───

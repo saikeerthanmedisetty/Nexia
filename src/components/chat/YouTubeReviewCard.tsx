@@ -91,6 +91,7 @@ export const YouTubeReviewCard: React.FC<YouTubeReviewCardProps> = ({
   const [isPublished, setIsPublished] = useState<boolean>(false);
   const [publishResult, setPublishResult] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authRequiredUrl, setAuthRequiredUrl] = useState<string | null>(null);
 
   // Switch active title when clicking title variations
   const handleSelectTitle = (title: string, index: number) => {
@@ -103,6 +104,7 @@ export const YouTubeReviewCard: React.FC<YouTubeReviewCardProps> = ({
   const handleApproveAndPublish = async () => {
     setIsPublishing(true);
     setErrorMessage(null);
+    setAuthRequiredUrl(null);
 
     const finalizedPayload: YouTubePayload = {
       ...initialData,
@@ -128,13 +130,18 @@ export const YouTubeReviewCard: React.FC<YouTubeReviewCardProps> = ({
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.success === false) {
-        const errorDetail = data.error || data.message || `HTTP ${res.status}`;
-        if (res.status === 502 || errorDetail.includes('not registered') || errorDetail.includes('404')) {
-          setErrorMessage(
-            '⚠️ Automated publishing channel is currently paused. Please verify the service connection and try again.'
-          );
+        if (data.needsAuth) {
+          setAuthRequiredUrl(data.authUrl || '/api/auth/google?returnTo=/chat');
+          setErrorMessage(data.error || 'Google YouTube OAuth connection required before publishing.');
         } else {
-          setErrorMessage(errorDetail);
+          const errorDetail = data.error || data.message || `HTTP ${res.status}`;
+          if (res.status === 502 || errorDetail.includes('not registered') || errorDetail.includes('404')) {
+            setErrorMessage(
+              '⚠️ Automated publishing channel is currently paused. Please verify the service connection and try again.'
+            );
+          } else {
+            setErrorMessage(errorDetail);
+          }
         }
         setIsPublishing(false);
         return;
@@ -392,20 +399,29 @@ export const YouTubeReviewCard: React.FC<YouTubeReviewCardProps> = ({
         </div>
       </div>
 
-      {/* Error Advisory */}
+      {/* Error Advisory & OAuth Link */}
       <AnimatePresence>
         {errorMessage && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mt-4 p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex flex-col gap-1.5 text-xs text-amber-200"
+            className="mt-4 p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex flex-col gap-2 text-xs text-amber-200"
           >
             <div className="flex items-center gap-2 font-semibold text-amber-300">
               <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Service Connection Required</span>
+              <span>{authRequiredUrl ? 'YouTube Channel Authorization Required' : 'Service Connection Required'}</span>
             </div>
             <p className="text-zinc-300 leading-relaxed">{errorMessage}</p>
+            {authRequiredUrl && (
+              <a
+                href={authRequiredUrl}
+                className="mt-1 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition-all w-fit cursor-pointer shadow-md shadow-red-950"
+              >
+                <span>🔑 Link YouTube Channel (@SaikeerthanMedisetty)</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -422,7 +438,20 @@ export const YouTubeReviewCard: React.FC<YouTubeReviewCardProps> = ({
           Cancel / Discard Draft
         </button>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {isPublished && (publishResult?.data?.videoUrl || publishResult?.videoUrl) && (
+            <a
+              href={publishResult?.data?.videoUrl || publishResult?.videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/30 transition-all cursor-pointer animate-pulse"
+            >
+              <Video className="w-3.5 h-3.5" />
+              <span>Watch on YouTube</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}

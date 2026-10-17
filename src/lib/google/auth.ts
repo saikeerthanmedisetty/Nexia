@@ -11,6 +11,7 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/youtube',
+  'https://www.googleapis.com/auth/youtube.upload',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
 ];
@@ -29,23 +30,23 @@ export interface GoogleTokenData {
 /**
  * Creates and returns a Google OAuth2 client instance
  */
-export function getOAuth2Client() {
+export function getOAuth2Client(redirectUri?: string) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/google/callback';
+  const finalRedirectUri = redirectUri || process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/google/callback';
 
   if (!clientId || !clientSecret) {
     console.warn('[Google Auth] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing in environment variables.');
   }
 
-  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  return new google.auth.OAuth2(clientId, clientSecret, finalRedirectUri);
 }
 
 /**
  * Generates the Google OAuth 2.0 Consent URL
  */
-export function generateAuthUrl(state?: string): string {
-  const oauth2Client = getOAuth2Client();
+export function generateAuthUrl(state?: string, redirectUri?: string): string {
+  const oauth2Client = getOAuth2Client(redirectUri);
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent select_account',
@@ -396,6 +397,38 @@ export async function getSheetsAuthClient(): Promise<any> {
   return null;
 }
 
+/**
+ * Returns an authenticated Google Auth Client specifically for YouTube uploads and channel management.
+ * YouTube video uploads strictly require User OAuth2 tokens (personal Google account @SaikeerthanMedisetty)
+ * because Google Service Accounts cannot own or upload videos to personal YouTube channels.
+ */
+export async function getYouTubeAuthClient(): Promise<any> {
+  const tokens = await getSavedTokens();
+  if (tokens && (tokens.refresh_token || tokens.access_token)) {
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials(tokens);
+
+    oauth2Client.on('tokens', async (newTokens) => {
+      console.log('[Google Auth] YouTube OAuth tokens refreshed automatically.');
+      await saveTokens({
+        ...newTokens,
+        refresh_token: newTokens.refresh_token || tokens.refresh_token,
+      });
+    });
+
+    return oauth2Client;
+  }
+
+  return null;
+}
+
+/**
+ * Checks whether user has authenticated with Google OAuth for YouTube operations.
+ */
+export async function isYouTubeOAuthConnected(): Promise<boolean> {
+  const tokens = await getSavedTokens();
+  return Boolean(tokens && (tokens.refresh_token || tokens.access_token));
+}
 
 /**
  * Checks whether Google Workspace is connected and authenticated

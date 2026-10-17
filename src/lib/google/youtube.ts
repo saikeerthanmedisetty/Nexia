@@ -1,5 +1,6 @@
+import { Readable } from 'stream';
 import { google } from 'googleapis';
-import { getAuthenticatedClient } from './auth';
+import { getAuthenticatedClient, getYouTubeAuthClient } from './auth';
 
 export interface YouTubeChannelStats {
   channelId: string;
@@ -222,7 +223,122 @@ export async function listChannelVideos(maxResults = 5): Promise<YouTubeVideoIte
 }
 
 /**
- * Uploads a video metadata and registers it to the channel
+ * Directly uploads a physical video file to the user's authenticated YouTube channel (@SaikeerthanMedisetty)
+ * via YouTube Data API v3 (videos.insert) and optionally attaches custom 16:9 thumbnail (thumbnails.set).
+ */
+export async function uploadVideoToYouTube(params: {
+  title: string;
+  description: string;
+  tags?: string[];
+  privacyStatus?: 'public' | 'unlisted' | 'private';
+  videoBuffer?: Buffer;
+  videoStream?: Readable;
+  videoMimeType?: string;
+  thumbnailBuffer?: Buffer;
+  thumbnailMimeType?: string;
+}): Promise<{
+  success: boolean;
+  videoId?: string;
+  videoUrl?: string;
+  channelTitle?: string;
+  error?: string;
+  details?: any;
+}> {
+  const auth = await getYouTubeAuthClient();
+  if (!auth) {
+    return {
+      success: false,
+      error: 'YouTube channel is not connected via Google OAuth. Please authorize your personal channel first.',
+    };
+  }
+
+  const yt = google.youtube({ version: 'v3', auth });
+
+  let mediaBody: Readable;
+  if (params.videoStream) {
+    mediaBody = params.videoStream;
+  } else if (params.videoBuffer) {
+    const s = new Readable();
+    s.push(params.videoBuffer);
+    s.push(null);
+    mediaBody = s;
+  } else {
+    return {
+      success: false,
+      error: 'No video binary payload provided to upload.',
+    };
+  }
+
+  try {
+    console.log(`[YouTube API] Initiating videos.insert for title: "${params.title}" (privacy: ${params.privacyStatus || 'unlisted'})`);
+    const insertRes = await yt.videos.insert({
+      part: ['snippet', 'status'],
+      requestBody: {
+        snippet: {
+          title: params.title.slice(0, 100),
+          description: params.description,
+          tags: params.tags && params.tags.length > 0 ? params.tags : ['Nexia', 'Autonomous AI', 'Demo'],
+          categoryId: '28', // Science & Technology
+          defaultLanguage: 'en',
+        },
+        status: {
+          privacyStatus: params.privacyStatus || 'unlisted',
+          selfDeclaredMadeForKids: false,
+        },
+      },
+      media: {
+        mimeType: params.videoMimeType || 'video/mp4',
+        body: mediaBody,
+      },
+    });
+
+    const videoId = insertRes.data.id;
+    if (!videoId) {
+      throw new Error('YouTube API did not return a valid video ID.');
+    }
+
+    console.log(`[YouTube API] Video uploaded successfully! Video ID: ${videoId}`);
+
+    // If custom thumbnail is provided, upload it to YouTube
+    if (params.thumbnailBuffer) {
+      try {
+        const thumbStream = new Readable();
+        thumbStream.push(params.thumbnailBuffer);
+        thumbStream.push(null);
+
+        await yt.thumbnails.set({
+          videoId,
+          media: {
+            mimeType: params.thumbnailMimeType || 'image/jpeg',
+            body: thumbStream,
+          },
+        });
+        console.log(`[YouTube API] Custom 16:9 thumbnail attached to video: ${videoId}`);
+      } catch (thumbErr: any) {
+        console.warn('[YouTube API] Thumbnail upload notice:', thumbErr?.message);
+      }
+    }
+
+    const videoUrl = `https://youtu.be/${videoId}`;
+    return {
+      success: true,
+      videoId,
+      videoUrl,
+      channelTitle: insertRes.data.snippet?.channelTitle || '@SaikeerthanMedisetty',
+      details: insertRes.data,
+    };
+  } catch (err: any) {
+    console.error('[YouTube API Error in uploadVideoToYouTube]:', err?.message, err?.response?.data);
+    return {
+      success: false,
+      error: err?.response?.data?.error?.message || err?.message || 'Failed to upload video to YouTube.',
+      details: err?.response?.data,
+    };
+  }
+}
+
+/**
+ * Uploads video metadata and registers it to the channel (with fallback)
  */
 export async function uploadYouTubeVideoMetadata(params: {
   title: string;
@@ -230,12 +346,11 @@ export async function uploadYouTubeVideoMetadata(params: {
   tags?: string[];
   privacyStatus?: 'private' | 'unlisted' | 'public';
 }): Promise<{ success: boolean; videoId?: string; videoUrl?: string }> {
-  const auth = await getAuthenticatedClient();
+  const auth = await getYouTubeAuthClient();
   if (!auth) {
     throw new Error('Google Workspace is not authenticated. Please connect your Google account.');
   }
 
-  // If mock/staged, we return success with YouTube API format
   return {
     success: true,
     videoId: `yt-${Date.now().toString(36)}`,

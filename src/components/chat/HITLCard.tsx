@@ -127,6 +127,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
     const defaultThumbUrl = p.thumbnail?.url || 'https://image.pollinations.ai/prompt/Cinematic%20high-contrast%20YouTube%20video%20thumbnail%2C%208k%20resolution?width=1280&height=720&nologo=true';
 
     const ytPayload: YouTubePayload = {
+      ...p,
       videoId: vidId,
       title: p.title || p.selected_title || defaultTitle,
       selected_title: p.selected_title || p.title || defaultTitle,
@@ -143,7 +144,11 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
         url: defaultThumbUrl,
         aspect_ratio: '16:9',
         dimensions: '1280x720',
-      }
+      },
+      videoData: p.videoData,
+      videoFileName: p.videoFileName,
+      videoMimeType: p.videoMimeType,
+      videoUrl: p.videoUrl || p.url,
     };
 
     return (
