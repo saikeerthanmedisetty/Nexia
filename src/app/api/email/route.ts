@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listRecentEmails, FALLBACK_EXECUTIVE_EMAILS } from '@/lib/google/gmail';
+import { listRecentEmails } from '@/lib/google/gmail';
 import { isGoogleConnected } from '@/lib/google/auth';
 
 export async function GET(req: Request) {
@@ -7,7 +7,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get('limit') || '25', 10);
     
-    // Always fetch messages safely
+    // Fetch live messages from personal Gmail inbox
     const messages = await listRecentEmails(limit);
 
     let email = 'saikeerthanmedisetty686@gmail.com';
@@ -21,14 +21,14 @@ export async function GET(req: Request) {
     return NextResponse.json({
       success: true,
       email,
-      messages: messages && messages.length > 0 ? messages : FALLBACK_EXECUTIVE_EMAILS.slice(0, limit),
+      messages: messages || [],
     });
   } catch (err: any) {
-    console.warn('[Email API] Notice fetching inbox messages:', err?.message);
+    console.warn('[Email API] Error fetching inbox messages:', err?.message);
     return NextResponse.json({
       success: true,
       email: 'saikeerthanmedisetty686@gmail.com',
-      messages: FALLBACK_EXECUTIVE_EMAILS,
+      messages: [],
     });
   }
 }

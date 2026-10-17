@@ -22,7 +22,7 @@ export async function GET() {
         name: status.name,
         connectedAt: status.connectedAt,
         youtube: null,
-        unreadEmails: unreadEmails > 0 ? unreadEmails : 3,
+        unreadEmails: typeof unreadEmails === 'number' ? unreadEmails : 0,
         isServiceAccount: true,
       });
     }

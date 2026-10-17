@@ -141,56 +141,6 @@ function generateFallbackSynthesis(email: EmailItem): SynthesizedEmail {
   const fromLower = email.from.toLowerCase();
   const subjectLower = email.subject.toLowerCase();
 
-  // 1. Elena Rostova - Series A Term Sheet
-  if (fromLower.includes('elena.rostova') || subjectLower.includes('term sheet')) {
-    return {
-      summary: 'Acme Ventures investment committee approved the $3.5M Series A allocation. Requesting confirmation for Thursday 3:00 PM IST closing call.',
-      proposedReply: `Dear Elena,\n\nThank you for the wonderful update regarding the investment committee's approval. I have reviewed the revised term sheet and the valuation cap aligns directly with our expansion milestones.\n\nThursday at 3:00 PM IST works perfectly for our closing sync. Looking forward to speaking then.\n\nBest regards,\nSai Keerthan`,
-      needsReply: true,
-      priority: 'High',
-    };
-  }
-
-  // 2. Marcus Vance - Infrastructure & Cloud Optimization
-  if (fromLower.includes('marcus') || subjectLower.includes('cluster scaling')) {
-    return {
-      summary: 'MongoDB Atlas partition migration concluded with 0ms downtime. Compute cluster utilization reduced by 34%, lowering monthly cloud expenditure.',
-      proposedReply: `Hi Marcus,\n\nOutstanding work on completing the migration with zero downtime. The 34% drop in cluster utilization is a tremendous win for our infrastructure efficiency and burn rate.\n\nPlease share the latency telemetry report ahead of our sync tomorrow.\n\nBest regards,\nSai Keerthan`,
-      needsReply: true,
-      priority: 'High',
-    };
-  }
-
-  // 3. David Kim - Stripe Billing Gateway
-  if (fromLower.includes('david.kim') || subjectLower.includes('stripe') || subjectLower.includes('settlement')) {
-    return {
-      summary: 'Stripe enterprise settlement window accelerated to T+1 for all ACH and international wire transfers. Sandbox API verification requested prior to cutover.',
-      proposedReply: `Hi David,\n\nThank you for accelerating the settlement window to T+1. Our engineering team has verified the custom webhook integration in sandbox and confirmed readiness for the live cutover.\n\nBest regards,\nSai Keerthan`,
-      needsReply: true,
-      priority: 'Normal',
-    };
-  }
-
-  // 4. Priya Sharma - Keynote Invitation
-  if (fromLower.includes('priya') || subjectLower.includes('keynote')) {
-    return {
-      summary: 'Official invitation to deliver the plenary keynote on Multi-Agent Orchestration & Enterprise Workflows at the Autonomous AI Systems Summit 2026.',
-      proposedReply: `Dear Priya,\n\nThank you for the gracious invitation to keynote the Autonomous AI Systems Summit 2026. I would be delighted to deliver the plenary session on Multi-Agent Orchestration.\n\nPlease share the presentation timeline and logistics with my office.\n\nBest regards,\nSai Keerthan`,
-      needsReply: true,
-      priority: 'Normal',
-    };
-  }
-
-  // 5. Sarah Jenkins - Partnership Agreement
-  if (fromLower.includes('sarah') || subjectLower.includes('partnership')) {
-    return {
-      summary: 'Legal counsel approved revised intellectual property and confidentiality covenants in Section 4. Execution copy prepared for digital signature.',
-      proposedReply: `Hi Sarah,\n\nThank you for following up. I have reviewed the revised IP and confidentiality terms in Section 4 and approve the agreement as finalized. Executing via DocuSign now.\n\nBest regards,\nSai Keerthan`,
-      needsReply: true,
-      priority: 'Normal',
-    };
-  }
-
   const isAutomated =
     fromLower.includes('no-reply') ||
     fromLower.includes('noreply') ||
