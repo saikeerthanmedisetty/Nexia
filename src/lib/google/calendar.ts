@@ -185,7 +185,6 @@ export async function createGoogleCalendarEvent(params: {
     location: params.location && params.location !== 'To be decided' ? params.location : (isVirtual ? 'Google Meet' : 'In-Person / To be decided'),
     start: params.isAllDay ? { date: params.date || startIso.split('T')[0] } : { dateTime: startIso },
     end: params.isAllDay ? { date: params.endDate || params.date || startIso.split('T')[0] } : { dateTime: endIso },
-    attendees: (validEmailAttendees.length > 0 ? validEmailAttendees : ['saikeerthanmedisetty686@gmail.com']).map(email => ({ email })),
     ...(params.recurrence ? { recurrence: params.recurrence } : {}),
     // Tentative = transparent (shows as free slot, soft block)
     ...(params.tentative ? { transparency: 'transparent', status: 'tentative' } : {}),
@@ -199,11 +198,28 @@ export async function createGoogleCalendarEvent(params: {
     } : {}),
   };
 
-  const res = await calendar.events.insert({
-    calendarId: getTargetCalendarId(),
-    requestBody,
-    conferenceDataVersion: 1,
-  });
+  let res: any;
+  try {
+    res = await calendar.events.insert({
+      calendarId: getTargetCalendarId(),
+      requestBody: {
+        ...requestBody,
+        ...(validEmailAttendees.length > 0 ? { attendees: validEmailAttendees.map(email => ({ email })) } : {}),
+      },
+      conferenceDataVersion: 1,
+    });
+  } catch (insertErr: any) {
+    if (insertErr?.message?.includes('Domain-Wide Delegation') || insertErr?.message?.includes('attendees')) {
+      // Retry without attendees array for Google Cloud Service Account compatibility
+      res = await calendar.events.insert({
+        calendarId: getTargetCalendarId(),
+        requestBody,
+        conferenceDataVersion: 1,
+      });
+    } else {
+      throw insertErr;
+    }
+  }
 
   const created = res.data;
   const meetUrl = created.hangoutLink || undefined;
@@ -219,7 +235,7 @@ export async function createGoogleCalendarEvent(params: {
     durationFormatted: `${duration}m`,
     location: created.location || (params.location && params.location !== 'To be decided' ? params.location : (isVirtual ? 'Google Meet' : 'In-Person / To be decided')),
     meetUrl,
-    attendees: (created.attendees || []).map(a => a.email).filter(Boolean) as string[],
+    attendees: (created.attendees || []).map((a: any) => a.email).filter(Boolean) as string[],
     type: 'meeting',
     status: 'confirmed',
     createdAt: created.created || new Date().toISOString(),
@@ -291,11 +307,25 @@ export async function updateGoogleCalendarEvent(
     }
   }
 
-  const res = await calendar.events.patch({
-    calendarId: getTargetCalendarId(),
-    eventId,
-    requestBody: patchBody,
-  });
+  let res: any;
+  try {
+    res = await calendar.events.patch({
+      calendarId: getTargetCalendarId(),
+      eventId,
+      requestBody: patchBody,
+    });
+  } catch (patchErr: any) {
+    if (patchErr?.message?.includes('Domain-Wide Delegation') || patchErr?.message?.includes('attendees')) {
+      delete patchBody.attendees;
+      res = await calendar.events.patch({
+        calendarId: getTargetCalendarId(),
+        eventId,
+        requestBody: patchBody,
+      });
+    } else {
+      throw patchErr;
+    }
+  }
 
   const updated = res.data;
   const start = updated.start?.dateTime || updated.start?.date || new Date().toISOString();
@@ -315,7 +345,7 @@ export async function updateGoogleCalendarEvent(
     durationFormatted: `${duration}m`,
     location: updated.location || updates.location || 'In-Person / To be decided',
     meetUrl: updated.hangoutLink || undefined,
-    attendees: (updated.attendees || []).map(a => a.email).filter(Boolean) as string[],
+    attendees: (updated.attendees || []).map((a: any) => a.email).filter(Boolean) as string[],
     type: 'meeting',
     status: 'confirmed',
     createdAt: updated.created || new Date().toISOString(),
