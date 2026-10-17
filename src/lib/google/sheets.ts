@@ -10,7 +10,9 @@ export interface ExpenseRow {
   description?: string;
 }
 
-let memorySpreadsheetId: string | null = null;
+export const DEFAULT_EXPENSE_SPREADSHEET_ID = '1_o7LUQYbIBS_W3IVVuB07nqt25Jo_b7U0a6tqZKuu_s';
+
+let memorySpreadsheetId: string | null = DEFAULT_EXPENSE_SPREADSHEET_ID;
 
 /**
  * Extracts a spreadsheet ID from a URL or raw ID string.
@@ -117,7 +119,7 @@ export async function getOrCreateExpenseSheetId(): Promise<string | null> {
     console.warn('[Sheets API] Drive file search notice (expected if Drive API not enabled):', err?.message);
   }
 
-  return null;
+  return DEFAULT_EXPENSE_SPREADSHEET_ID;
 }
 
 /**
