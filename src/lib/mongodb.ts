@@ -21,8 +21,8 @@ let clientPromise: Promise<MongoClient> | null = null;
 if (MONGODB_URI) {
   try {
     const client = new MongoClient(MONGODB_URI, {
-      serverSelectionTimeoutMS: 3000,
-      connectTimeoutMS: 3000,
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 8000,
     });
 
     if (process.env.NODE_ENV === "development") {
@@ -56,7 +56,7 @@ export async function getDb(): Promise<Db | null> {
     const client = await Promise.race([
       clientPromise,
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("MongoDB connection timeout")), 2500)
+        setTimeout(() => reject(new Error("MongoDB connection timeout")), 8000)
       ),
     ]);
     return client.db();

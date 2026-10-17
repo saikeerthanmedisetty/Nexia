@@ -48,12 +48,13 @@ export function generateAuthUrl(state?: string): string {
   const oauth2Client = getOAuth2Client();
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    prompt: 'consent',
+    prompt: 'consent select_account',
     scope: GOOGLE_SCOPES,
     state: state || 'google_auth_state',
-    include_granted_scopes: true,
   });
 }
+
+let memoryTokenCache: GoogleTokenData | null = null;
 
 /**
  * Saves tokens securely in MongoDB Atlas and local disk cache fallback
@@ -69,6 +70,8 @@ export async function saveTokens(tokens: GoogleTokenData): Promise<void> {
     connectedAt: new Date().toISOString(),
   };
 
+  memoryTokenCache = merged;
+
   // 1. Save to local disk cache fallback
   try {
     fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(merged, null, 2), 'utf-8');
@@ -79,11 +82,12 @@ export async function saveTokens(tokens: GoogleTokenData): Promise<void> {
   // 2. Persist to MongoDB Atlas
   try {
     await executeMongoOperation(async (db: any) => {
+      const { _id, ...cleanMerged } = merged as any;
       await db.collection('google_tokens').updateOne(
         { id: 'primary_google_account' },
         {
           $set: {
-            ...merged,
+            ...cleanMerged,
             id: 'primary_google_account',
             updatedAt: new Date().toISOString(),
           },
@@ -140,6 +144,11 @@ export function getSavedTokensSync(): GoogleTokenData | null {
  * Asynchronously retrieves saved tokens (Environment variables first, MongoDB Atlas second, with local disk fallback)
  */
 export async function getSavedTokens(): Promise<GoogleTokenData | null> {
+  // 0. In-memory cache
+  if (memoryTokenCache && (memoryTokenCache.refresh_token || memoryTokenCache.access_token)) {
+    return memoryTokenCache;
+  }
+
   // 1. Direct environment variable check
   const envTokens = getSavedTokensSync();
   if (envTokens?.refresh_token) {
