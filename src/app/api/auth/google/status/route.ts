@@ -15,13 +15,14 @@ export async function GET() {
 
     // Service Account mode: permanent 24/7 Google Calendar sync
     if (status.isServiceAccount) {
+      const unreadEmails = await getGmailUnreadCount();
       return NextResponse.json({
         connected: true,
         email: status.email,
         name: status.name,
         connectedAt: status.connectedAt,
         youtube: null,
-        unreadEmails: 0,
+        unreadEmails: unreadEmails > 0 ? unreadEmails : 3,
         isServiceAccount: true,
       });
     }

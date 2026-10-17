@@ -259,6 +259,7 @@ export default function ExecutiveDashboardPage() {
   // ⚡ Live Telemetry Auto-Syncing Loop (5-Second Real-Time Pulse)
   useEffect(() => {
     fetchDashboardData(true);
+    fetchInboxEmails();
     const interval = setInterval(() => {
       fetchDashboardData(true);
     }, 5000);
@@ -1215,7 +1216,7 @@ export default function ExecutiveDashboardPage() {
                       <RefreshCw size={24} className="animate-spin text-indigo-500 mx-auto" />
                       <div className="text-xs font-mono text-slate-500 dark:text-zinc-400">Loading messages from Gmail...</div>
                     </div>
-                  ) : !googleStatus.connected ? (
+                  ) : !googleStatus.connected && inboxEmails.length === 0 ? (
                     <div className="py-16 text-center space-y-3 px-6">
                       <Mail size={32} className="text-slate-400 dark:text-zinc-600 mx-auto" />
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white font-mono">Google Account Not Connected</h4>
