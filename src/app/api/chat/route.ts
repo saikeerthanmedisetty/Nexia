@@ -815,6 +815,14 @@ A deep technical breakdown demonstrating autonomous executive orchestration pair
     }
 
     // ─── 5. General Conversational Reply ───
+    if (intent.response || (intent.type === 'general' && intent.explanation)) {
+      return NextResponse.json({
+        type: 'general',
+        response: intent.response || intent.explanation,
+        traceSteps: intent.traceSteps,
+      });
+    }
+
     const reply = await chat(messages, crossSessionMemory);
     return NextResponse.json({
       type: 'general',

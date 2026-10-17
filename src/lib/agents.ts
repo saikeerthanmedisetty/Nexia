@@ -1860,15 +1860,39 @@ function parseMeetingParams(params: AgentExecutionParams) {
     }
 
     case 'UBER': {
-      const destination = params.destination || 'Destination';
-      const pickup = params.pickup || 'Current Location';
+      const destination = params.destination || '';
+      const pickup = params.pickup || '';
+
+      const isVague = (loc: string) => {
+        if (!loc) return true;
+        const t = loc.trim().toLowerCase();
+        const vague = ['campus', 'airport', 'office', 'home', 'station', 'college', 'hotel', 'here', 'there', 'destination', 'pickup', 'current location', 'dropoff location'];
+        return vague.includes(t) || (!t.includes(' ') && t.length < 15);
+      };
+
+      if (isVague(pickup) || isVague(destination)) {
+        return {
+          success: true,
+          data: {
+            pickup: pickup || 'Unspecified',
+            destination: destination || 'Unspecified',
+            message: `📍 **Specific Route & Vehicle Required for Accurate Tariff Calculation**\n\n` +
+              `The endpoints ("${pickup || 'Campus'}" to "${destination || 'Airport'}") are general keywords without specific street addresses or city context.\n\n` +
+              `To calculate an accurate fare and check live availability, please provide:\n` +
+              `1. **Specific Pickup:** Exact pickup landmark or address and city\n` +
+              `2. **Specific Destination:** Exact destination address or airport terminal\n` +
+              `3. **Preferred Tier:** Uber Auto, Uber Go, Uber Premier, Uber XL, or Uber Moto`,
+          },
+        };
+      }
+
       const bookingUrl = `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodeURIComponent(destination)}`;
       return {
         success: true,
         data: {
           pickup,
           destination,
-          message: `🚗 **Uber Ride Route Prepared**\n\n• **Pickup:** ${pickup}\n• **Destination:** ${destination}\n• **Estimated Fare:** ₹180 – ₹240\n\n[Open Uber App to Confirm & Dispatch](${bookingUrl})`,
+          message: `🚗 **Uber Ride Route Prepared**\n\n• **Pickup:** ${pickup}\n• **Destination:** ${destination}\n\n[Open Uber App to Confirm & Dispatch](${bookingUrl})`,
         },
       };
     }

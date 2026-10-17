@@ -52,7 +52,12 @@ export function ChatInput({ onSend, isLoading, onStop }: ChatInputProps) {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
+    let val = e.target.value;
+    // Strip accidental leading whitespace when typing or pasting into an empty input
+    if (!message && val.trimStart() !== val) {
+      val = val.trimStart();
+    }
+    setMessage(val);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
@@ -60,9 +65,11 @@ export function ChatInput({ onSend, isLoading, onStop }: ChatInputProps) {
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
 
+    // Check for pasted images first
+    const items = clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (item.type.startsWith('image/')) {
@@ -82,9 +89,38 @@ export function ChatInput({ onSend, isLoading, onStop }: ChatInputProps) {
             toast.success('Screenshot pasted & attached!');
           };
           reader.readAsDataURL(file);
-          break;
+          return;
         }
       }
+    }
+
+    // Handle plain text paste: strip accidental leading whitespace or tabs from formatted markdown/quotes
+    const pastedText = clipboardData.getData('text/plain');
+    if (pastedText) {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart || 0;
+      const end = target.selectionEnd || 0;
+      const currentVal = target.value;
+
+      // Clean leading whitespace if pasting into an empty input or at start
+      let cleaned = pastedText;
+      if (start === 0 || currentVal.trim() === '') {
+        cleaned = pastedText.trimStart();
+      }
+
+      const nextVal = currentVal.substring(0, start) + cleaned + currentVal.substring(end);
+      setMessage(nextVal);
+
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          const newPos = start + cleaned.length;
+          textareaRef.current.selectionStart = newPos;
+          textareaRef.current.selectionEnd = newPos;
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+        }
+      });
     }
   };
 

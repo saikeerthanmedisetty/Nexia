@@ -395,9 +395,13 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
       ];
     }
     if (isCalendar) {
+      const loc = p?.location || '';
+      const isPhysicalLocation = loc && loc !== 'To be decided' && !/meet|zoom|virtual|video/i.test(loc);
       return [
         { id: 'fu-1', label: 'Schedule 15m departure buffer', shortcut: '⌘ 1', prompt: `Schedule a 15-minute buffer before "${heroMain}"` },
-        { id: 'fu-2', label: 'Get ride estimate to meeting', shortcut: '⌘ 2', prompt: `Get a ride estimate for ${heroMain}` },
+        isPhysicalLocation
+          ? { id: 'fu-2', label: 'Get ride estimate to meeting', shortcut: '⌘ 2', prompt: `Get a ride estimate to ${loc}` }
+          : { id: 'fu-2', label: 'Check for schedule conflicts', shortcut: '⌘ 2', prompt: `Check schedule availability around "${heroMain}"` },
         { id: 'fu-3', label: "Review tomorrow's full agenda", shortcut: '⌘ 3', prompt: "Show my full agenda for tomorrow" },
       ];
     }

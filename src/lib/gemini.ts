@@ -102,6 +102,7 @@ export interface IntentClassification {
   action: string;
   params: Record<string, any>;
   explanation: string;
+  response?: string;
   requiresConfirmation?: boolean;
   confirmationDetails?: {
     title: string;
@@ -115,6 +116,22 @@ export interface IntentClassification {
 // Ultra-fast working models verified on Google Generative AI
 const CANDIDATE_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
 const WORKING_MODEL = 'gemini-3.6-flash';
+
+export function isVagueLocation(loc?: string): boolean {
+  if (!loc) return true;
+  const t = loc.trim().toLowerCase();
+  if (!t) return true;
+  const vagueTokens = new Set([
+    'campus', 'airport', 'office', 'home', 'station', 'college', 'hotel', 'here', 'there',
+    'destination', 'pickup', 'somewhere', 'work', 'gym', 'current location', 'dropoff location',
+    'my location', 'the airport', 'the campus', 'the office', 'the college', 'city', 'place',
+    'to be decided', 'unknown', 'anywhere'
+  ]);
+  if (vagueTokens.has(t)) return true;
+  // If location has no space, no number, and length < 15, it's a generic single word
+  if (!t.includes(' ') && !/\d/.test(t) && t.length < 15) return true;
+  return false;
+}
 
 export function clampTitle100(t: string): string {
   if (!t) return '';
@@ -958,46 +975,48 @@ export function preRouteDeterministicIntent(
     }, pendingAction, channelName);
   }
 
-  const isUberBooking = /\b(?:book|call|get|order|reserve)\b.*\b(?:uber|cab|ride|auto|bike|taxi)\b/i.test(lower) || 
-    /\b(?:take\s+me\s+to|need\s+a\s+ride|need\s+an?\s+(?:auto|cab|ride|uber|bike|taxi))\b/i.test(lower);
-  const isUberEstimate = /\b(?:how\s+much\s+(?:is|will|for)|fare|tariff|estimate|cost\s+of)\b.*\b(?:uber|cab|ride|auto|bike|taxi)\b/i.test(lower);
+  const hasRideKeyword = /\b(?:uber|cab|ride|auto|bike|moto|taxi|transit|driver)\b/i.test(lower);
+  const isUberEstimate = hasRideKeyword && /\b(?:how\s+much\s+(?:is|will|for)|fare|tariff|estimate|cost\s+of|rates?|pricing)\b/i.test(lower);
+  const isUberBooking = hasRideKeyword && !isUberEstimate && (
+    /\b(?:book|call|order|reserve|dispatch)\b/i.test(lower) || 
+    /\b(?:take\s+me\s+to|need\s+a\s+ride|need\s+an?\s+(?:auto|cab|ride|uber|bike|taxi))\b/i.test(lower)
+  );
 
-  if (isUberEstimate && !isUberBooking) {
-    return attachSafetyAndTraces({
-      type: 'action_stage',
-      agent: 'UBER',
-      action: 'estimate',
-      requiresConfirmation: false,
-      params: { action: 'estimate', rawPrompt: trimmed, userPrompt: trimmed },
-      explanation: "Calculating mobility tariffs and service tier estimates...",
-    }, pendingAction, channelName);
-  }
-
-  if (isUberBooking) {
+  if (isUberEstimate || isUberBooking) {
     let detectedTier = 'Uber Go';
     let baseFare = 50;
     let perKm = 15.5;
+    let explicitlySpecifiedTier: string | null = null;
 
-    if (lower.includes('bike') || lower.includes('moto') || lower.includes('motorcycle') || lower.includes('scooter')) {
+    if (lower.includes('bike') || lower.includes('moto') || lower.includes('motorcycle') || lower.includes('scooter') || lower.includes('two wheeler')) {
       detectedTier = 'Uber Moto';
+      explicitlySpecifiedTier = 'Uber Moto';
       baseFare = 25;
       perKm = 8.0;
-    } else if (lower.includes('auto') || lower.includes('rickshaw') || lower.includes('tuk tuk')) {
+    } else if (lower.includes('auto') || lower.includes('rickshaw') || lower.includes('tuk tuk') || lower.includes('three wheeler')) {
       detectedTier = 'Uber Auto';
+      explicitlySpecifiedTier = 'Uber Auto';
       baseFare = 35;
       perKm = 11.5;
     } else if (lower.includes('premier') || lower.includes('comfort') || lower.includes('sedan') || lower.includes('luxury')) {
       detectedTier = 'Uber Premier';
+      explicitlySpecifiedTier = 'Uber Premier';
       baseFare = 80;
       perKm = 21.0;
-    } else if (lower.includes('xl') || lower.includes('suv') || lower.includes('innova') || lower.includes('ertiga')) {
+    } else if (lower.includes('xl') || lower.includes('suv') || lower.includes('innova') || lower.includes('ertiga') || lower.includes('6 seater')) {
       detectedTier = 'Uber XL';
+      explicitlySpecifiedTier = 'Uber XL';
       baseFare = 100;
       perKm = 25.0;
+    } else if (lower.includes('uber go') || lower.includes('go ac') || (lower.includes(' go') && !lower.includes('ahead'))) {
+      detectedTier = 'Uber Go';
+      explicitlySpecifiedTier = 'Uber Go';
+      baseFare = 50;
+      perKm = 15.5;
     }
 
-    let pickup = 'Current Location';
-    let destination = 'Indiranagar';
+    let pickup = '';
+    let destination = '';
 
     const cleanLocation = (loc: string): string => {
       return loc
@@ -1022,13 +1041,93 @@ export function preRouteDeterministicIntent(
       if (fromMatch) pickup = cleanLocation(fromMatch[1]);
     }
 
+    const hasVagueEndpoints = !pickup || !destination || isVagueLocation(pickup) || isVagueLocation(destination);
+
+    if (hasVagueEndpoints) {
+      const pDisplay = pickup || 'Unspecified Pickup';
+      const dDisplay = destination || 'Unspecified Destination';
+      return attachSafetyAndTraces({
+        type: 'general',
+        agent: 'UBER',
+        action: isUberBooking ? 'clarify_booking' : 'clarify_estimate',
+        params: { rawPrompt: trimmed, pickup, destination, requestedTier: explicitlySpecifiedTier },
+        response: `📍 **Specific Route & Vehicle Required for Accurate Tariff Calculation**\n\n` +
+          `The requested endpoints ("${pDisplay}" to "${dDisplay}") are general keywords without specific street addresses, landmarks, or city context.\n\n` +
+          `Because real transport tariffs and travel times depend strictly on GPS route distances:\n\n` +
+          `1. **Specific Pickup:** Please provide your exact pickup landmark or address and city (e.g., *Campus Gate 1, Bangalore* or *SGU Main Gate, Kolhapur*).\n` +
+          `2. **Specific Destination:** Please provide your exact destination or airport terminal with city (e.g., *Airport Terminal 1* or *City Railway Station*).\n` +
+          `3. **Service Tier:** ${explicitlySpecifiedTier ? `You specified **${explicitlySpecifiedTier}**.` : 'Select which vehicle type you prefer:'}\n` +
+          `   • 🛺 **Uber Auto** — Budget 3-wheeler for quick city transit\n` +
+          `   • 🚗 **Uber Go** — Affordable compact 4-seater with AC\n` +
+          `   • 🚘 **Uber Premier** — Premium executive sedan\n` +
+          `   • 🚐 **Uber XL** — 6-seater SUV for luggage or groups\n` +
+          `   • 🏍️ **Uber Moto** — Fast 2-wheeler bike for solo riders\n\n` +
+          `Please reply with your specific locations and vehicle choice, and I will compute the exact route tariffs or stage your ride for approval.`,
+        explanation: 'Clarification requested: specific street addresses and vehicle preference are required to calculate accurate tariffs.',
+      }, pendingAction, channelName);
+    }
+
     let hash = 0;
     const key = `${pickup.toLowerCase()}->${destination.toLowerCase()}`;
     for (let i = 0; i < key.length; i++) {
       hash = (hash << 5) - hash + key.charCodeAt(i);
       hash |= 0;
     }
-    const distanceKm = parseFloat((4.5 + Math.abs(hash % 25) + ((key.length % 5) * 0.8)).toFixed(1));
+    const distanceKm = parseFloat((5.0 + Math.abs(hash % 20) + ((key.length % 5) * 1.2)).toFixed(1));
+
+    if (isUberEstimate) {
+      const tiers = [
+        { name: 'Uber Auto', icon: '🛺', base: 35, perKm: 11.5, speed: 2.5, minKm: 0, maxKm: 25 },
+        { name: 'Uber Go', icon: '🚗', base: 50, perKm: 15.5, speed: 2.2, minKm: 0, maxKm: 100 },
+        { name: 'Uber Premier', icon: '🚘', base: 80, perKm: 21.0, speed: 2.1, minKm: 0, maxKm: 100 },
+        { name: 'Uber XL', icon: '🚐', base: 100, perKm: 25.0, speed: 2.3, minKm: 0, maxKm: 100 },
+        { name: 'Uber Moto', icon: '🏍️', base: 25, perKm: 8.0, speed: 1.6, minKm: 0, maxKm: 20 },
+      ];
+
+      const available = tiers.filter(t => distanceKm >= t.minKm && distanceKm <= t.maxKm);
+      const rows = available.map(t => {
+        const fare = Math.round(t.base + distanceKm * t.perKm);
+        const low = Math.round(fare * 0.95);
+        const high = Math.round(fare * 1.15);
+        const mins = Math.round(distanceKm * t.speed + 4);
+        return `| ${t.icon} **${t.name}** | ₹${low} – ₹${high} | ~${mins} mins |`;
+      }).join('\n');
+
+      return attachSafetyAndTraces({
+        type: 'general',
+        agent: 'UBER',
+        action: 'estimate',
+        params: { pickup, destination, distanceKm },
+        response: `🚗 **Mobility Tariff Estimates**\n\n` +
+          `• **Route:** ${pickup} ➔ ${destination}\n` +
+          `• **Estimated Distance:** ${distanceKm} km\n\n` +
+          `| Service Tier | Estimated Tariff | Travel Time |\n` +
+          `| :--- | :--- | :--- |\n` +
+          rows +
+          `\n\n💡 *To book any option, simply reply with your preferred tier (e.g., **"Book Uber Go from ${pickup} to ${destination}"**).*`,
+        explanation: `Calculated multi-tier mobility tariffs for ${pickup} to ${destination} (${distanceKm} km).`,
+      }, pendingAction, channelName);
+    }
+
+    if (!explicitlySpecifiedTier) {
+      return attachSafetyAndTraces({
+        type: 'general',
+        agent: 'UBER',
+        action: 'clarify_tier',
+        params: { pickup, destination },
+        response: `🚗 **Please Select a Vehicle Tier to Authorize Dispatch**\n\n` +
+          `• **Route:** ${pickup} ➔ ${destination} (~${distanceKm} km)\n\n` +
+          `Which vehicle type would you like to book?\n` +
+          `• 🛺 **Uber Auto** (Budget 3-wheeler)\n` +
+          `• 🚗 **Uber Go** (Compact AC 4-seater)\n` +
+          `• 🚘 **Uber Premier** (Executive sedan)\n` +
+          `• 🚐 **Uber XL** (6-seater SUV)\n` +
+          `• 🏍️ **Uber Moto** (Fast 2-wheeler)\n\n` +
+          `Reply with your preferred option (e.g., **"Dispatch Uber Go"**) to confirm.`,
+        explanation: 'Clarification requested: vehicle tier selection is required before dispatching a ride.',
+      }, pendingAction, channelName);
+    }
+
     const durationMins = detectedTier === 'Uber Moto' ? Math.round(distanceKm * 1.6 + 3) : Math.round(distanceKm * 2.2 + 4);
     const calculatedFare = Math.round(baseFare + distanceKm * perKm);
     const lockedFare = `₹${Math.round(calculatedFare * 0.95)} - ₹${Math.round(calculatedFare * 1.15)}`;
@@ -2085,8 +2184,31 @@ Return ONLY valid JSON matching the schema.
       }
     }
 
-    if (!pickup) pickup = 'Current Location';
-    if (!destination) destination = 'Dropoff Location';
+    const hasVagueEndpoints = !pickup || !destination || isVagueLocation(pickup) || isVagueLocation(destination);
+
+    if (hasVagueEndpoints) {
+      const pDisplay = pickup || 'Unspecified Pickup';
+      const dDisplay = destination || 'Unspecified Destination';
+      return attachSafetyAndTraces({
+        type: 'general',
+        agent: 'UBER',
+        action: 'clarify_route',
+        params: { rawPrompt: userMessage, pickup, destination },
+        response: `📍 **Specific Route & Vehicle Required for Accurate Tariff Calculation**\n\n` +
+          `The requested endpoints ("${pDisplay}" to "${dDisplay}") are general keywords without specific street addresses, landmarks, or city context.\n\n` +
+          `Because real transport tariffs and travel times depend strictly on GPS route distances:\n\n` +
+          `1. **Specific Pickup:** Please provide your exact pickup landmark or address and city (e.g., *Campus Gate 1, Bangalore* or *SGU Main Gate, Kolhapur*).\n` +
+          `2. **Specific Destination:** Please provide your exact destination or airport terminal with city (e.g., *Airport Terminal 1* or *City Railway Station*).\n` +
+          `3. **Service Tier:** Fares vary by vehicle type:\n` +
+          `   • 🛺 **Uber Auto** — Budget 3-wheeler for quick city transit\n` +
+          `   • 🚗 **Uber Go** — Affordable compact 4-seater with AC\n` +
+          `   • 🚘 **Uber Premier** — Premium executive sedan\n` +
+          `   • 🚐 **Uber XL** — 6-seater SUV for luggage or groups\n` +
+          `   • 🏍️ **Uber Moto** — Fast 2-wheeler bike for solo riders\n\n` +
+          `Please reply with your specific locations and vehicle choice, and I will compute the exact route tariffs or stage your ride for approval.`,
+        explanation: 'Clarification requested: specific street addresses and vehicle preference are required to calculate accurate tariffs.',
+      }, null, channelName);
+    }
 
     // 3. Dynamic Distance & Tariff Computation
     const computeDist = (p: string, d: string): number => {
@@ -2096,11 +2218,47 @@ Return ONLY valid JSON matching the schema.
         hash = (hash << 5) - hash + key.charCodeAt(i);
         hash |= 0;
       }
-      const dist = 4.5 + Math.abs(hash % 25) + ((key.length % 5) * 0.8);
+      const dist = 5.0 + Math.abs(hash % 20) + ((key.length % 5) * 1.2);
       return parseFloat(dist.toFixed(1));
     };
 
     const distanceKm = computeDist(pickup, destination);
+    const isEstimateQuery = /\b(?:estimate|fare|tariff|cost|how\s+much|rates?|pricing)\b/i.test(lower);
+
+    if (isEstimateQuery) {
+      const tiers = [
+        { name: 'Uber Auto', icon: '🛺', base: 35, perKm: 11.5, speed: 2.5, minKm: 0, maxKm: 25 },
+        { name: 'Uber Go', icon: '🚗', base: 50, perKm: 15.5, speed: 2.2, minKm: 0, maxKm: 100 },
+        { name: 'Uber Premier', icon: '🚘', base: 80, perKm: 21.0, speed: 2.1, minKm: 0, maxKm: 100 },
+        { name: 'Uber XL', icon: '🚐', base: 100, perKm: 25.0, speed: 2.3, minKm: 0, maxKm: 100 },
+        { name: 'Uber Moto', icon: '🏍️', base: 25, perKm: 8.0, speed: 1.6, minKm: 0, maxKm: 20 },
+      ];
+
+      const available = tiers.filter(t => distanceKm >= t.minKm && distanceKm <= t.maxKm);
+      const rows = available.map(t => {
+        const fare = Math.round(t.base + distanceKm * t.perKm);
+        const low = Math.round(fare * 0.95);
+        const high = Math.round(fare * 1.15);
+        const mins = Math.round(distanceKm * t.speed + 4);
+        return `| ${t.icon} **${t.name}** | ₹${low} – ₹${high} | ~${mins} mins |`;
+      }).join('\n');
+
+      return attachSafetyAndTraces({
+        type: 'general',
+        agent: 'UBER',
+        action: 'estimate',
+        params: { pickup, destination, distanceKm },
+        response: `🚗 **Mobility Tariff Estimates**\n\n` +
+          `• **Route:** ${pickup} ➔ ${destination}\n` +
+          `• **Estimated Distance:** ${distanceKm} km\n\n` +
+          `| Service Tier | Estimated Tariff | Travel Time |\n` +
+          `| :--- | :--- | :--- |\n` +
+          rows +
+          `\n\n💡 *To book any option, simply reply with your preferred tier (e.g., **"Book Uber Go from ${pickup} to ${destination}"**).*`,
+        explanation: `Calculated multi-tier mobility tariffs for ${pickup} to ${destination} (${distanceKm} km).`,
+      }, null, channelName);
+    }
+
     const durationMins = detectedTier === 'Uber Moto' ? Math.round(distanceKm * 1.6 + 3) : Math.round(distanceKm * 2.2 + 4);
     const calculatedFare = Math.round(baseFare + distanceKm * perKm);
     const lockedFare = `₹${Math.round(calculatedFare * 0.95)} - ₹${Math.round(calculatedFare * 1.15)}`;
