@@ -1407,6 +1407,7 @@ function parseMeetingParams(params: AgentExecutionParams) {
           },
         };
       } else {
+        const errorDetail = sheetsError ? `\n\n⚠️ *Sync Detail: ${sheetsError}*` : '';
         return {
           success: true,
           data: {
@@ -1415,7 +1416,7 @@ function parseMeetingParams(params: AgentExecutionParams) {
             merchant,
             category,
             date,
-            message: `📊 **Expense Recorded to Ledger**\n\n• **Amount:** ₹${amount}\n• **Merchant:** ${merchant}\n• **Category:** ${category}\n• **Date:** ${date}${receiptLine}\n• **Status:** Saved to MongoDB Vault ⚠️ *(Google Sheet sync pending)*\n\nℹ️ *Row was not added to your Google Sheet because the Spreadsheet ID is needed. Please paste your Google Sheet link or spreadsheet ID here to link it instantly!*`,
+            message: `📊 **Expense Recorded to Ledger**\n\n• **Amount:** ₹${amount}\n• **Merchant:** ${merchant}\n• **Category:** ${category}\n• **Date:** ${date}${receiptLine}\n• **Status:** Saved to MongoDB Vault ⚠️ *(Google Sheet sync pending)*${errorDetail}`,
           },
         };
       }
