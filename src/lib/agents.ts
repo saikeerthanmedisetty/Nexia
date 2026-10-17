@@ -17,7 +17,7 @@ import {
 import { recordTask } from './tasks';
 import { isGoogleConnected } from './google/auth';
 import { sendGmailMessage, listRecentEmails, getGmailUnreadCount } from './google/gmail';
-import { appendSpreadsheetExpense, getSpreadsheetExpenses } from './google/sheets';
+import { appendSpreadsheetExpense, getSpreadsheetExpenses, setExpenseSpreadsheetId, syncPendingExpensesToSpreadsheet, extractSpreadsheetId } from './google/sheets';
 import { createGoogleCalendarEvent, deleteGoogleCalendarEvent, updateGoogleCalendarEvent, queryGoogleCalendarFreebusy, patchGoogleCalendarRecurrence, listGoogleCalendarEvents } from './google/calendar';
 import { getChannelStats, listChannelVideos, uploadYouTubeVideoMetadata } from './google/youtube';
 import { generateFinancialStatement } from './finance';
@@ -1285,25 +1285,139 @@ function parseMeetingParams(params: AgentExecutionParams) {
     }
   }
 
-  // 2. If SHEETS listing or append is requested
+  // 2. If SHEETS action is requested
   if (agentId === 'SHEETS') {
     const act = (params.action || '').toLowerCase();
 
-    // Direct Google Sheets append if connected
+    // A. Connect / Link Google Spreadsheet
+    if (act.includes('connect') || act.includes('link') || (act.includes('set') && (params.spreadsheetId || params.url))) {
+      const rawTarget = params.spreadsheetId || params.url || params.sheetId || params.message || '';
+      const savedId = await setExpenseSpreadsheetId(rawTarget);
+      if (savedId) {
+        // Automatically back-sync any pending unsynced expenses from MongoDB
+        const syncResult = await syncPendingExpensesToSpreadsheet(savedId);
+        const backSyncMsg = syncResult.syncedCount > 0
+          ? `\n\n🔄 **Auto-Synced ${syncResult.syncedCount} Pending Expense${syncResult.syncedCount > 1 ? 's' : ''}:**\n` +
+            syncResult.syncedExpenses.map(e => `• ₹${e.amount} — ${e.merchant} (${e.date})`).join('\n')
+          : '';
+
+        return {
+          success: true,
+          data: {
+            status: 'connected',
+            spreadsheetId: savedId,
+            message: `🔗 **Google Sheet Connected Successfully!**\n\n` +
+              `• **Spreadsheet ID:** \`${savedId}\`\n` +
+              `• **Status:** Connected & Verified ✅\n` +
+              `• **View Sheet:** [Open in Google Sheets](https://docs.google.com/spreadsheets/d/${savedId}/edit)` +
+              backSyncMsg +
+              `\n\nAll subsequent expenses will now be recorded directly into this spreadsheet in real time.`,
+          },
+        };
+      }
+    }
+
+    // B. Direct Google Sheets append
     if (act.includes('append') || act.includes('log') || act.includes('add') || act.includes('record')) {
-      const googleStatus = await isGoogleConnected();
-      if (googleStatus.connected && params.amount) {
-        try {
-          await appendSpreadsheetExpense({
-            date: params.date || new Date().toISOString().split('T')[0],
-            merchant: params.merchant || 'Direct Entry',
-            category: params.category || 'General',
-            amount: Number(params.amount) || 0,
-            description: params.description,
-          });
-        } catch (sheetErr: any) {
-          console.warn('[agents.ts] Google Sheets append notice:', sheetErr?.message);
+      const amount = Number(params.amount) || 0;
+      const merchant = params.merchant || 'Direct Entry';
+      const category = params.category || 'General';
+      const date = params.date || new Date().toISOString().split('T')[0];
+      const description = params.description || 'Omni-Agent Entry';
+      const receiptUrl = params.receiptUrl || params.receipt_url || null;
+
+      let sheetsSuccess = false;
+      let sheetsError: string | null = null;
+      let linkedSpreadsheetId: string | null = null;
+
+      // 1. Attempt direct append to Google Sheets
+      try {
+        const sheetRes = await appendSpreadsheetExpense({
+          date,
+          merchant,
+          category,
+          amount,
+          description,
+        });
+        if (sheetRes?.success) {
+          sheetsSuccess = true;
+          linkedSpreadsheetId = sheetRes.spreadsheetId || null;
         }
+      } catch (sheetErr: any) {
+        sheetsError = sheetErr?.message || 'Google Sheets sync failed';
+        console.warn('[agents.ts] Direct Google Sheets append notice:', sheetsError);
+      }
+
+      // 2. If direct append failed, also attempt n8n webhook if configured
+      if (!sheetsSuccess && isRealWebhook) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          const n8nRes = await fetch(webhookUrl!, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...params, amount, merchant, category, date }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          if (n8nRes.ok) {
+            sheetsSuccess = true;
+          }
+        } catch (n8nErr: any) {
+          console.warn('[agents.ts] n8n Sheets fallback notice:', n8nErr?.message);
+        }
+      }
+
+      // 3. Always persist to MongoDB Atlas so transaction is safe
+      try {
+        await executeMongoOperation(async (db: any) => {
+          await db.collection('expenses').insertOne({
+            amount,
+            category,
+            merchant,
+            date,
+            description,
+            receiptUrl,
+            syncedToSheets: sheetsSuccess,
+            syncedSpreadsheetId: linkedSpreadsheetId,
+            createdAt: new Date(),
+          });
+        });
+      } catch (mongoErr) {
+        console.warn('[agents.ts] MongoDB persistence notice:', mongoErr);
+      }
+
+      const receiptLine = receiptUrl ? `\n• **Receipt:** [View Scanned Receipt](${receiptUrl})` : '';
+
+      // 4. Return Truthful Status (never claim Google Sheets sync if failed)
+      if (sheetsSuccess) {
+        const sheetLink = linkedSpreadsheetId
+          ? `\n\n🔗 **[View in Google Sheet](https://docs.google.com/spreadsheets/d/${linkedSpreadsheetId}/edit)**`
+          : '';
+        return {
+          success: true,
+          data: {
+            status: 'synced_to_sheets',
+            amount,
+            merchant,
+            category,
+            date,
+            spreadsheetId: linkedSpreadsheetId,
+            message: `📊 **Expense Recorded to Google Sheet**\n\n• **Amount:** ₹${amount}\n• **Merchant:** ${merchant}\n• **Category:** ${category}\n• **Date:** ${date}${receiptLine}\n• **Status:** Synced directly to Google Sheet ✅${sheetLink}`,
+          },
+        };
+      } else {
+        return {
+          success: true,
+          data: {
+            status: 'saved_locally',
+            amount,
+            merchant,
+            category,
+            date,
+            message: `📊 **Expense Recorded to Ledger**\n\n• **Amount:** ₹${amount}\n• **Merchant:** ${merchant}\n• **Category:** ${category}\n• **Date:** ${date}${receiptLine}\n• **Status:** Saved to MongoDB Vault ⚠️ *(Google Sheet sync pending)*\n\nℹ️ *Row was not added to your Google Sheet because the Spreadsheet ID is needed. Please paste your Google Sheet link or spreadsheet ID here to link it instantly!*`,
+          },
+        };
       }
     }
 
@@ -1898,11 +2012,31 @@ function parseMeetingParams(params: AgentExecutionParams) {
     }
 
     case 'SHEETS': {
-      const amount = params.amount || 0;
+      const amount = Number(params.amount) || 0;
       const category = params.category || 'General';
       const merchant = params.merchant || 'Expense';
       const date = params.date || new Date().toISOString().split('T')[0];
       const receiptUrl = params.receiptUrl || params.receipt_url || null;
+      const description = params.description || 'Omni-Agent Entry';
+
+      let sheetsSuccess = false;
+      let linkedSpreadsheetId: string | null = null;
+
+      try {
+        const sheetRes = await appendSpreadsheetExpense({
+          date,
+          merchant,
+          category,
+          amount,
+          description,
+        });
+        if (sheetRes?.success) {
+          sheetsSuccess = true;
+          linkedSpreadsheetId = sheetRes.spreadsheetId || null;
+        }
+      } catch (err: any) {
+        console.warn('[agents.ts] Fallback Google Sheets append notice:', err?.message);
+      }
 
       // Save to MongoDB
       await executeMongoOperation(async (db: any) => {
@@ -1912,17 +2046,34 @@ function parseMeetingParams(params: AgentExecutionParams) {
           merchant,
           date,
           receiptUrl,
+          syncedToSheets: sheetsSuccess,
+          syncedSpreadsheetId: linkedSpreadsheetId,
           createdAt: new Date(),
         });
       });
 
       const receiptLine = receiptUrl ? `\n• **Receipt:** [View Scanned Receipt](${receiptUrl})` : '';
 
+      if (sheetsSuccess) {
+        const sheetLink = linkedSpreadsheetId
+          ? `\n\n🔗 **[View in Google Sheet](https://docs.google.com/spreadsheets/d/${linkedSpreadsheetId}/edit)**`
+          : '';
+        return {
+          success: true,
+          data: {
+            receiptUrl,
+            status: 'synced_to_sheets',
+            message: `📊 **Expense Recorded to Google Sheet**\n\n• **Amount:** ₹${amount}\n• **Merchant:** ${merchant}\n• **Category:** ${category}\n• **Date:** ${date}${receiptLine}\n• **Status:** Synced directly to Google Sheet ✅${sheetLink}`,
+          },
+        };
+      }
+
       return {
         success: true,
         data: {
           receiptUrl,
-          message: `📊 **Expense Recorded**\n\n• **Amount:** ₹${amount}\n• **Merchant:** ${merchant}\n• **Category:** ${category}\n• **Date:** ${date}${receiptLine}\n• **Status:** Saved to your ledger ✅`,
+          status: 'saved_locally',
+          message: `📊 **Expense Recorded to Ledger**\n\n• **Amount:** ₹${amount}\n• **Merchant:** ${merchant}\n• **Category:** ${category}\n• **Date:** ${date}${receiptLine}\n• **Status:** Saved to MongoDB Vault ⚠️ *(Google Sheet sync pending)*\n\nℹ️ *Row was not added to your Google Sheet because the Spreadsheet ID is needed. Please paste your Google Sheet link or spreadsheet ID here to link it instantly!*`,
         },
       };
     }

@@ -159,9 +159,17 @@ export async function POST(req: Request) {
           message = 'Calendar task completed successfully!';
         }
       } else if (agentId === 'SHEETS') {
-        const amt = params?.amount ? `₹${Number(params.amount).toLocaleString('en-IN')}` : 'Expenditure';
-        const cat = params?.category ? ` (${params.category})` : '';
-        message = `💳 **Financial Ledger Updated!**\n\nSuccessfully committed **${amt}**${cat} to your Executive Financial Vault.\n\n• **Date:** ${params?.date || new Date().toISOString().split('T')[0]}\n• **Merchant / Vendor:** ${params?.merchant || 'Direct'}\n• **Vault Status:** Encrypted & Recorded ✅`;
+        if (result.data?.message) {
+          message = result.data.message;
+        } else {
+          const amt = params?.amount ? `₹${Number(params.amount).toLocaleString('en-IN')}` : 'Expenditure';
+          const cat = params?.category ? ` (${params.category})` : '';
+          const isSynced = result.data?.status === 'synced_to_sheets';
+          const statusLine = isSynced
+            ? '• **Vault Status:** Synced directly to Google Sheet ✅'
+            : '• **Vault Status:** Saved to MongoDB Vault ⚠️ *(Google Sheet sync pending)*';
+          message = `💳 **Financial Ledger Updated!**\n\nSuccessfully recorded **${amt}**${cat} to your Executive Financial Vault.\n\n• **Date:** ${params?.date || new Date().toISOString().split('T')[0]}\n• **Merchant / Vendor:** ${params?.merchant || 'Direct'}\n${statusLine}`;
+        }
       } else if (agentId === 'UBER') {
         const bId = result.data?.booking_id || result.data?.['Booking ID'] || params?.booking_id || 'UBER-DISPATCH';
         const tier = result.data?.tier || result.data?.Tier || params?.selected_tier || 'Uber Premier AC';

@@ -364,6 +364,33 @@ export async function getGmailAuthClient(): Promise<any> {
   return getAuthenticatedClient();
 }
 
+/**
+ * Returns an authenticated Google Auth Client specifically optimized for Google Sheets.
+ * Priority 1: User OAuth2 Tokens (since personal spreadsheets are owned by the user).
+ * Priority 2: Service Account (if spreadsheet is shared with service account).
+ */
+export async function getSheetsAuthClient(): Promise<any> {
+  // 1. Priority 1 for Sheets: Saved User OAuth Tokens
+  const tokens = await getSavedTokens();
+  if (tokens && (tokens.refresh_token || tokens.access_token)) {
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials(tokens);
+
+    oauth2Client.on('tokens', async (newTokens) => {
+      console.log('[Google Auth] Sheets OAuth tokens refreshed automatically.');
+      await saveTokens({
+        ...newTokens,
+        refresh_token: newTokens.refresh_token || tokens.refresh_token,
+      });
+    });
+
+    return oauth2Client;
+  }
+
+  // 2. Priority 2: Service Account
+  return getAuthenticatedClient();
+}
+
 
 /**
  * Checks whether Google Workspace is connected and authenticated

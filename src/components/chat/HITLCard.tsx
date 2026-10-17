@@ -881,7 +881,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
                 : isEmail 
                 ? 'Correspondence dispatched successfully! ✅' 
                 : isSheets
-                ? 'Financial expenditure committed to ledger successfully! ✅'
+                ? 'Financial expenditure verified & recorded! ✅'
                 : isCalendar
                 ? 'Event confirmed and added to your Executive Schedule! ✅'
                 : isUber

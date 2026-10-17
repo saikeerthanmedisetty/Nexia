@@ -696,7 +696,29 @@ export function preRouteDeterministicIntent(
   }
 
   // 3. SHEETS Agent Deterministic Pre-Routing
-  // A. Expense Logging / Append Row
+  // A. Google Sheets Link / Connect Detection
+  const sheetsUrlMatch = trimmed.match(/(?:https?:\/\/)?docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/i);
+  const rawSheetIdMatch = trimmed.match(/\b(?:sheet\s*id|spreadsheet\s*id)[\s:=]+([a-zA-Z0-9-_]{20,})\b/i);
+  const detectedSheetId = sheetsUrlMatch?.[1] || rawSheetIdMatch?.[1];
+
+  if (detectedSheetId) {
+    return attachSafetyAndTraces({
+      type: 'action_stage',
+      agent: 'SHEETS',
+      action: 'connect_sheet',
+      requiresConfirmation: false,
+      params: {
+        action: 'connect_sheet',
+        spreadsheetId: detectedSheetId,
+        url: sheetsUrlMatch?.[0] || `https://docs.google.com/spreadsheets/d/${detectedSheetId}/edit`,
+        rawPrompt: trimmed,
+        userPrompt: trimmed,
+      },
+      explanation: `Connecting and linking your Google Spreadsheet (${detectedSheetId})...`,
+    }, pendingAction, channelName);
+  }
+
+  // B. Expense Logging / Append Row
   const hasExpenseLogVerb = /\b(?:log|record|add|enter|track|save|spent|paid)\b/i.test(lower);
   const cleanForAmount = lower.replace(/,/g, '');
   const amountMatch = cleanForAmount.match(/(?:₹|\$|rs\.?|inr)?\s*(\d+(?:\.\d{1,2})?)/i);
