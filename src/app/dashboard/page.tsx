@@ -504,7 +504,7 @@ export default function ExecutiveDashboardPage() {
           <Header onOpenProfile={() => setIsProfileOpen(true)} />
 
           {/* Dashboard Scrollable Body */}
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6 overscroll-contain overscroll-y-contain" style={{ overscrollBehavior: 'contain', overscrollBehaviorY: 'contain' }}>
             
             {/* ── Top Hero Bar: Clock, Live Status & Quick Action ── */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-white/5">
@@ -1227,7 +1227,7 @@ export default function ExecutiveDashboardPage() {
                 </div>
 
                 {/* Messages List Body */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+                <div className="flex-1 overflow-y-auto p-4 space-y-2.5 overscroll-contain overscroll-y-contain" style={{ overscrollBehavior: 'contain', overscrollBehaviorY: 'contain' }}>
                   {isFetchingInbox && inboxEmails.length === 0 ? (
                     <div className="py-20 text-center space-y-3">
                       <RefreshCw size={24} className="animate-spin text-indigo-500 mx-auto" />

@@ -100,8 +100,8 @@ export function ChatWindow({
         ref={containerRef}
         onScroll={handleScroll}
         tabIndex={0}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6 scroll-smooth outline-none"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6 scroll-smooth outline-none overscroll-contain overscroll-y-contain"
+        style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', overscrollBehaviorY: 'contain' }}
       >
         
         {messages.length === 0 ? (
