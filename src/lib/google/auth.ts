@@ -439,32 +439,35 @@ export async function isGoogleConnected(): Promise<{
   name?: string;
   connectedAt?: string;
   isServiceAccount?: boolean;
+  hasOAuth?: boolean;
 }> {
-  // 1. Check Service Account first (Permanent 24/7)
+  // 1. Priority 1: User OAuth Tokens (provides live personal Gmail & YouTube)
+  const tokens = await getSavedTokens();
+  if (tokens && (tokens.refresh_token || tokens.access_token)) {
+    return {
+      connected: true,
+      email: tokens.userEmail || 'saikeerthanmedisetty686@gmail.com',
+      name: tokens.userName || 'Sai Keerthan',
+      connectedAt: tokens.connectedAt || new Date().toISOString(),
+      isServiceAccount: false,
+      hasOAuth: true,
+    };
+  }
+
+  // 2. Priority 2: Google Cloud Service Account (24/7 background for Calendar & Sheets)
   const serviceAccount = getServiceAccountCredentials();
   if (serviceAccount) {
     return {
       connected: true,
       email: process.env.GOOGLE_CALENDAR_ID || 'saikeerthanmedisetty686@gmail.com',
-      name: 'Nexia Workspace (Service Account)',
+      name: 'Sai Keerthan',
       connectedAt: 'Permanent 24/7',
       isServiceAccount: true,
+      hasOAuth: false,
     };
   }
 
-  // 2. Fallback to OAuth tokens
-  const tokens = await getSavedTokens();
-  if (!tokens || (!tokens.refresh_token && !tokens.access_token)) {
-    return { connected: false };
-  }
-
-  return {
-    connected: true,
-    email: tokens.userEmail || 'saikeerthanmedisetty686@gmail.com',
-    name: tokens.userName || 'Sai Keerthan',
-    connectedAt: tokens.connectedAt,
-    isServiceAccount: false,
-  };
+  return { connected: false, hasOAuth: false };
 }
 
 /**

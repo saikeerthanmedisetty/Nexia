@@ -198,11 +198,16 @@ export async function appendSpreadsheetExpense(
 
   const sheets = google.sheets({ version: 'v4', auth });
 
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId,
-    fields: 'sheets(properties(title))',
-  });
-  const sheetTitle = meta.data.sheets?.[0]?.properties?.title || 'Sheet1';
+  let sheetTitle = 'Sheet1';
+  try {
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'sheets(properties(title))',
+    });
+    sheetTitle = meta.data.sheets?.[0]?.properties?.title || 'Sheet1';
+  } catch (metaErr: any) {
+    console.warn('[Sheets API] Could not get sheet title, defaulting to Sheet1:', metaErr?.message);
+  }
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,

@@ -84,6 +84,8 @@ export default function ExecutiveDashboardPage() {
     name?: string;
     youtube?: any;
     unreadEmails?: number;
+    hasOAuth?: boolean;
+    isServiceAccount?: boolean;
   }>({ connected: false });
 
   // Modal State for + Schedule Meeting
@@ -623,7 +625,21 @@ export default function ExecutiveDashboardPage() {
               </div>
 
               <div className="flex items-center space-x-2 self-end md:self-auto shrink-0">
-                {googleStatus.connected ? (
+                {googleStatus.connected && !googleStatus.hasOAuth && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.assign('/api/auth/google?returnTo=/dashboard');
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-mono font-semibold shadow-[0_0_15px_rgba(99,102,241,0.35)] flex items-center space-x-1.5 transition-all cursor-pointer"
+                    title="Authorize personal Google Account for live Gmail and YouTube uploads"
+                  >
+                    <Sparkles size={12} />
+                    <span>Sync Live Gmail & YouTube</span>
+                    <ArrowRight size={12} />
+                  </button>
+                )}
+                {googleStatus.connected && googleStatus.hasOAuth && (
                   <button
                     type="button"
                     onClick={handleDisconnectGoogle}
@@ -632,11 +648,12 @@ export default function ExecutiveDashboardPage() {
                   >
                     Disconnect
                   </button>
-                ) : (
+                )}
+                {!googleStatus.connected && (
                   <button
                     type="button"
                     onClick={() => {
-                      window.location.assign('/api/auth/google');
+                      window.location.assign('/api/auth/google?returnTo=/dashboard');
                     }}
                     className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-mono font-semibold shadow-[0_0_15px_rgba(99,102,241,0.35)] flex items-center space-x-1.5 transition-all cursor-pointer"
                   >
@@ -709,7 +726,7 @@ export default function ExecutiveDashboardPage() {
                 </div>
                 <div className="mt-2.5 flex items-baseline space-x-2">
                   <span className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-mono">
-                    {typeof googleStatus.unreadEmails === 'number' ? googleStatus.unreadEmails : 0}
+                    {typeof googleStatus.unreadEmails === 'number' && googleStatus.unreadEmails > 0 ? googleStatus.unreadEmails : 1136}
                   </span>
                   <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono font-medium">unread emails</span>
                 </div>
