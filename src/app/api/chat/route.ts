@@ -91,12 +91,17 @@ export async function POST(req: Request) {
     }
 
     // ─── 2.5 Live Calendar Auto-Sync ───
-    // Automatically synchronize live Google Calendar events before intent staging & conflict analysis
-    const isCalRelated = /\b(?:schedule|meeting|meet|retro|event|calendar|book|slot|sync|session|call|agenda|free|busy|conflict|available|availability|appointment|reminder|tomorrow|today|tonight|morning|afternoon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i.test(promptText);
+    // Only synchronize live Google Calendar for genuine calendar operations, never for mobility/transit prompts
+    const hasRideKeyword = /\b(?:uber|cab|ride|auto|bike|moto|taxi|transit)\b/i.test(promptText);
+    const isCalRelated = !hasRideKeyword && /\b(?:schedule|meeting|meet|retro|event|calendar|slot|sync|session|call|agenda|free|busy|conflict|available|availability|appointment|reminder)\b/i.test(promptText);
     if (isCalRelated) {
       try {
         const { syncGoogleCalendarToStore } = await import('@/lib/calendar');
-        await syncGoogleCalendarToStore();
+        // Fast non-blocking timeout (1200ms) so calendar sync never blocks or delays the chat response
+        await Promise.race([
+          syncGoogleCalendarToStore(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Cal sync fast timeout')), 1200))
+        ]);
       } catch (syncErr: any) {
         console.warn('[Chat API] Live calendar auto-sync notice:', syncErr?.message);
       }

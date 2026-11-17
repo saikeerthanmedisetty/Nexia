@@ -821,7 +821,7 @@ function ChatPageContent() {
       const errorMessage: Message = {
         id: generateId(),
         role: "assistant",
-        content: "I ran into a temporary hiccup connecting to the workflow. Once your service or webhook is running, simply reply **'retry'** or **'continue'** and I'll take care of it right away!",
+        content: "I encountered a brief connection delay while processing your request. Please try sending your message again.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);

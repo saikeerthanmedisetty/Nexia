@@ -2079,7 +2079,7 @@ function parseMeetingParams(params: AgentExecutionParams) {
         success: false,
         error: err.message,
         data: {
-          message: `I couldn't connect to your automation workflow just now. Once your webhook is running in n8n, simply tell me **"retry"** or **"continue"**, and I'll pick right back up!`,
+          message: `I encountered a brief connection delay while communicating with the service. Please try again.`,
         },
       };
     }
@@ -2094,7 +2094,7 @@ function parseMeetingParams(params: AgentExecutionParams) {
         success: false,
         error: 'service_unavailable',
         data: {
-          message: `I wasn't able to reach the email dispatch workflow just now. Once your webhook is active in n8n, simply reply **"retry"** and I'll send it for you!`,
+          message: `Unable to dispatch email correspondence at this moment. Please check your service configuration and try again.`,
         },
       };
     }
@@ -2104,7 +2104,7 @@ function parseMeetingParams(params: AgentExecutionParams) {
         success: false,
         error: 'service_unavailable',
         data: {
-          message: `I couldn't sync with the calendar workflow right now. Once your webhook is ready, just say **"retry"** and I'll schedule it right away!`,
+          message: `Unable to synchronize with the schedule service at this moment. Please try again.`,
         },
       };
     }
