@@ -1,9 +1,11 @@
 import { google } from 'googleapis';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { executeMongoOperation } from '../mongodb';
 
-const TOKEN_CACHE_FILE = path.join(process.cwd(), '.google-tokens.json');
+const TOKEN_CACHE_FILE = path.join(os.tmpdir(), '.google-tokens.json');
+const LOCAL_TOKEN_CACHE_FILE = path.join(process.cwd(), '.google-tokens.json');
 
 export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar',
@@ -58,27 +60,32 @@ export function generateAuthUrl(state?: string, redirectUri?: string): string {
 let memoryTokenCache: GoogleTokenData | null = null;
 
 /**
- * Saves tokens securely in MongoDB Atlas and local disk cache fallback
+ * Saves tokens securely in memory, disk cache (/tmp and local), and MongoDB Atlas
  */
 export async function saveTokens(tokens: GoogleTokenData): Promise<void> {
   const existing = (await getSavedTokens()) || getSavedTokensSync() || {};
   const refreshToken = tokens.refresh_token || existing.refresh_token;
 
-  const merged = {
+  const merged: GoogleTokenData = {
     ...existing,
     ...tokens,
     refresh_token: refreshToken,
-    connectedAt: new Date().toISOString(),
+    connectedAt: existing.connectedAt || new Date().toISOString(),
   };
 
   memoryTokenCache = merged;
 
-  // 1. Save to local disk cache fallback
+  // 1. Save to /tmp disk cache fallback (always writable on Vercel and local)
   try {
     fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(merged, null, 2), 'utf-8');
   } catch (err: any) {
-    console.warn('[Google Auth] Save disk tokens notice:', err?.message);
+    console.warn('[Google Auth] Save /tmp tokens notice:', err?.message);
   }
+
+  // Also try local root directory if writable (development)
+  try {
+    fs.writeFileSync(LOCAL_TOKEN_CACHE_FILE, JSON.stringify(merged, null, 2), 'utf-8');
+  } catch {}
 
   // 2. Persist to MongoDB Atlas
   try {
@@ -102,10 +109,14 @@ export async function saveTokens(tokens: GoogleTokenData): Promise<void> {
 }
 
 /**
- * Synchronously retrieves saved tokens from environment variables (Priority 1 for Vercel/Cloud)
- * or local disk cache
+ * Synchronously retrieves saved tokens from environment variables,
+ * in-memory cache, or disk cache
  */
 export function getSavedTokensSync(): GoogleTokenData | null {
+  if (memoryTokenCache && (memoryTokenCache.refresh_token || memoryTokenCache.access_token)) {
+    return memoryTokenCache;
+  }
+
   // 1. Check environment variable token configuration (24/7 serverless cloud priority)
   if (process.env.GOOGLE_REFRESH_TOKEN) {
     return {
@@ -127,22 +138,29 @@ export function getSavedTokensSync(): GoogleTokenData | null {
     } catch {}
   }
 
-  // 2. Fallback to local cache file
-  try {
-    if (fs.existsSync(TOKEN_CACHE_FILE)) {
-      const data = fs.readFileSync(TOKEN_CACHE_FILE, 'utf-8');
-      if (data && data.trim()) {
-        return JSON.parse(data);
+  // 2. Fallback to disk cache files (/tmp or local)
+  const candidateFiles = [LOCAL_TOKEN_CACHE_FILE, TOKEN_CACHE_FILE];
+  for (const file of candidateFiles) {
+    try {
+      if (fs.existsSync(file)) {
+        const data = fs.readFileSync(file, 'utf-8');
+        if (data && data.trim()) {
+          const parsed = JSON.parse(data);
+          if (parsed && (parsed.refresh_token || parsed.access_token)) {
+            return parsed;
+          }
+        }
       }
+    } catch (err: any) {
+      console.warn(`[Google Auth] Read disk tokens notice for ${file}:`, err?.message);
     }
-  } catch (err: any) {
-    console.warn('[Google Auth] Read disk tokens notice:', err?.message);
   }
+
   return null;
 }
 
 /**
- * Asynchronously retrieves saved tokens (Environment variables first, MongoDB Atlas second, with local disk fallback)
+ * Asynchronously retrieves saved tokens (In-Memory -> Request Cookie -> Environment Variables -> MongoDB Atlas -> Disk Cache)
  */
 export async function getSavedTokens(): Promise<GoogleTokenData | null> {
   // 0. In-memory cache
@@ -150,25 +168,42 @@ export async function getSavedTokens(): Promise<GoogleTokenData | null> {
     return memoryTokenCache;
   }
 
-  // 1. Direct environment variable check
+  // 1. Check HTTP-only cookie if available in Next.js request context
+  try {
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const rawCookie = cookieStore.get('nexia_google_token')?.value;
+    if (rawCookie) {
+      const decoded = decodeURIComponent(rawCookie);
+      const parsed = JSON.parse(decoded);
+      if (parsed && (parsed.refresh_token || parsed.access_token)) {
+        memoryTokenCache = parsed;
+        return parsed;
+      }
+    }
+  } catch {}
+
+  // 2. Direct environment variable check
   const envTokens = getSavedTokensSync();
   if (envTokens?.refresh_token) {
+    memoryTokenCache = envTokens;
     return envTokens;
   }
 
-  // 2. Try MongoDB Atlas
+  // 3. Try MongoDB Atlas
   try {
     const record = await executeMongoOperation(async (db: any) => {
       return db.collection('google_tokens').findOne({ id: 'primary_google_account' });
     });
     if (record && (record.refresh_token || record.access_token)) {
+      memoryTokenCache = record as GoogleTokenData;
       return record as GoogleTokenData;
     }
   } catch (err: any) {
     console.warn('[Google Auth] MongoDB fetch tokens notice:', err?.message);
   }
 
-  // 3. Fallback to local cache
+  // 4. Fallback to disk cache
   return getSavedTokensSync();
 }
 
@@ -340,11 +375,10 @@ export async function getAuthenticatedClient(): Promise<any> {
 
 /**
  * Returns an authenticated Google Auth Client specifically optimized for Gmail.
- * Priority 1: User OAuth2 Tokens (since personal mailboxes strictly require user consent).
- * Priority 2: Service Account (fallback for enterprise workspace domains).
+ * Personal mailboxes strictly require User OAuth2 tokens (Service Accounts cannot query 'me').
  */
 export async function getGmailAuthClient(): Promise<any> {
-  // 1. Priority 1 for Gmail: Saved User OAuth Tokens
+  // 1. Saved User OAuth Tokens
   const tokens = await getSavedTokens();
   if (tokens && (tokens.refresh_token || tokens.access_token)) {
     const oauth2Client = getOAuth2Client();
@@ -361,7 +395,32 @@ export async function getGmailAuthClient(): Promise<any> {
     return oauth2Client;
   }
 
-  // 2. Priority 2: Service Account
+  // Personal Gmail strictly requires user consent. Never return service account for personal inbox.
+  return null;
+}
+
+/**
+ * Returns an authenticated Google Auth Client specifically optimized for Google Calendar.
+ * Priority 1: User OAuth2 Tokens (direct access to user's primary calendar).
+ * Priority 2: Service Account (only when explicit calendar delegation/sharing is granted).
+ */
+export async function getCalendarAuthClient(): Promise<any> {
+  const tokens = await getSavedTokens();
+  if (tokens && (tokens.refresh_token || tokens.access_token)) {
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials(tokens);
+
+    oauth2Client.on('tokens', async (newTokens) => {
+      console.log('[Google Auth] Calendar OAuth tokens refreshed automatically.');
+      await saveTokens({
+        ...newTokens,
+        refresh_token: newTokens.refresh_token || tokens.refresh_token,
+      });
+    });
+
+    return oauth2Client;
+  }
+
   return getAuthenticatedClient();
 }
 
@@ -431,7 +490,8 @@ export async function isYouTubeOAuthConnected(): Promise<boolean> {
 }
 
 /**
- * Checks whether Google Workspace is connected and authenticated
+ * Checks whether Google Workspace is connected and authenticated.
+ * Connected is TRUE ONLY when genuine user OAuth tokens are available.
  */
 export async function isGoogleConnected(): Promise<{
   connected: boolean;
@@ -454,14 +514,14 @@ export async function isGoogleConnected(): Promise<{
     };
   }
 
-  // 2. Priority 2: Google Cloud Service Account (24/7 background for Calendar & Sheets)
+  // 2. Google Cloud Service Account (only covers Sheets, cannot access personal Gmail/YouTube)
   const serviceAccount = getServiceAccountCredentials();
   if (serviceAccount) {
     return {
-      connected: true,
-      email: process.env.GOOGLE_CALENDAR_ID || 'saikeerthanmedisetty686@gmail.com',
+      connected: false, // Personal Google Suite is NOT connected without user OAuth
+      email: 'saikeerthanmedisetty686@gmail.com',
       name: 'Sai Keerthan',
-      connectedAt: 'Permanent 24/7',
+      connectedAt: 'Service Account Active (Sheets Only)',
       isServiceAccount: true,
       hasOAuth: false,
     };
@@ -474,9 +534,17 @@ export async function isGoogleConnected(): Promise<{
  * Disconnects the Google account and wipes stored tokens
  */
 export async function disconnectGoogle(): Promise<boolean> {
+  memoryTokenCache = null;
+
   try {
     if (fs.existsSync(TOKEN_CACHE_FILE)) {
       fs.unlinkSync(TOKEN_CACHE_FILE);
+    }
+  } catch {}
+
+  try {
+    if (fs.existsSync(LOCAL_TOKEN_CACHE_FILE)) {
+      fs.unlinkSync(LOCAL_TOKEN_CACHE_FILE);
     }
   } catch {}
 

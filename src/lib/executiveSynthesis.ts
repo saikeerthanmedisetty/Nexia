@@ -53,7 +53,7 @@ export async function synthesizeExecutiveResponse(options: ExecutiveSynthesisOpt
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const modelsToTry = ['gemini-3.5-flash-lite', 'gemini-3.6-flash'];
+    const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
 
     const userContent = `User Prompt: "${userPrompt}"
 Operational Domain: ${agent}

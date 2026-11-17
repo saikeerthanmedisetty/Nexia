@@ -584,62 +584,44 @@ export default function ExecutiveDashboardPage() {
               <div className="flex items-center space-x-3">
                 <div className={cn(
                   "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border",
-                  googleStatus.connected
+                  googleStatus.connected && googleStatus.hasOAuth
                     ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
                     : "bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400"
                 )}>
-                  {googleStatus.connected ? <Check size={18} /> : <Sparkles size={18} />}
+                  {googleStatus.connected && googleStatus.hasOAuth ? <Check size={18} /> : <Sparkles size={18} />}
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span>Google Cloud Suite: YouTube, Calendar, Gmail & Sheets</span>
                     <span className={cn(
                       "text-[10px] px-2 py-0.5 rounded-full font-mono font-medium border",
-                      googleStatus.connected
+                      googleStatus.connected && googleStatus.hasOAuth
                         ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30"
                         : "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30"
                     )}>
-                      {googleStatus.connected ? "Active & Synced ✅" : "1-Click Direct Cloud OAuth"}
+                      {googleStatus.connected && googleStatus.hasOAuth ? "Active & Synced ✅" : "Personal Account Disconnected"}
                     </span>
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {googleStatus.connected ? (
+                    {googleStatus.connected && googleStatus.hasOAuth ? (
                       <>
                         <span>Account: <strong className="text-slate-800 dark:text-zinc-200">{googleStatus.email}</strong></span>
                         <span>•</span>
                         <span>Channel: <strong className="text-red-600 dark:text-red-400">@SaikeerthanMedisetty</strong></span>
-                        {typeof googleStatus.unreadEmails === 'number' && (
-                          <>
-                            <span>•</span>
-                            <span>Gmail: <strong className="text-indigo-600 dark:text-indigo-400">{googleStatus.unreadEmails} unread</strong></span>
-                          </>
-                        )}
+                        <span>•</span>
+                        <span>Gmail: <strong className="text-indigo-600 dark:text-indigo-400">{googleStatus.unreadEmails ?? 0} unread</strong></span>
                         <span>•</span>
                         <span className="text-emerald-600 dark:text-emerald-400">Sheets Ledger & Meet Connected</span>
                       </>
                     ) : (
-                      <span>Connect official Google APIs directly with zero n8n dependency, 24/7 background sync & permanent refresh tokens.</span>
+                      <span>Connect personal Google account (<strong className="text-indigo-600 dark:text-indigo-400">saikeerthanmedisetty686@gmail.com</strong>) to activate live Gmail, Calendar, and YouTube.</span>
                     )}
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center space-x-2 self-end md:self-auto shrink-0">
-                {googleStatus.connected && !googleStatus.hasOAuth && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.assign('/api/auth/google?returnTo=/dashboard');
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-mono font-semibold shadow-[0_0_15px_rgba(99,102,241,0.35)] flex items-center space-x-1.5 transition-all cursor-pointer"
-                    title="Authorize personal Google Account for live Gmail and YouTube uploads"
-                  >
-                    <Sparkles size={12} />
-                    <span>Sync Live Gmail & YouTube</span>
-                    <ArrowRight size={12} />
-                  </button>
-                )}
-                {googleStatus.connected && googleStatus.hasOAuth && (
+                {googleStatus.connected && googleStatus.hasOAuth ? (
                   <button
                     type="button"
                     onClick={handleDisconnectGoogle}
@@ -648,8 +630,7 @@ export default function ExecutiveDashboardPage() {
                   >
                     Disconnect
                   </button>
-                )}
-                {!googleStatus.connected && (
+                ) : (
                   <button
                     type="button"
                     onClick={() => {
@@ -658,7 +639,7 @@ export default function ExecutiveDashboardPage() {
                     className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-mono font-semibold shadow-[0_0_15px_rgba(99,102,241,0.35)] flex items-center space-x-1.5 transition-all cursor-pointer"
                   >
                     <Sparkles size={12} />
-                    <span>Connect Google Suite</span>
+                    <span>Connect Personal Google Account</span>
                     <ArrowRight size={12} />
                   </button>
                 )}
@@ -726,12 +707,16 @@ export default function ExecutiveDashboardPage() {
                 </div>
                 <div className="mt-2.5 flex items-baseline space-x-2">
                   <span className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-mono">
-                    {typeof googleStatus.unreadEmails === 'number' && googleStatus.unreadEmails > 0 ? googleStatus.unreadEmails : 1136}
+                    {googleStatus.connected && typeof googleStatus.unreadEmails === 'number'
+                      ? googleStatus.unreadEmails
+                      : 0}
                   </span>
-                  <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono font-medium">unread emails</span>
+                  <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono font-medium">
+                    {googleStatus.connected && googleStatus.unreadEmails === 0 ? "inbox caught up" : "unread emails"}
+                  </span>
                 </div>
                 <div className="mt-2 text-[11px] text-slate-500 dark:text-zinc-400 font-mono truncate flex items-center justify-between">
-                  <span className="truncate">{googleStatus.connected ? (googleStatus.email || "saikeerthanmedisetty686@gmail.com") : "Connect Google Suite"}</span>
+                  <span className="truncate">{googleStatus.connected ? (googleStatus.email || "saikeerthanmedisetty686@gmail.com") : "Connect Personal Gmail"}</span>
                   <ArrowRight size={11} className="text-slate-400 dark:text-zinc-600 group-hover:text-indigo-500 transition-colors shrink-0 ml-1" />
                 </div>
                 <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
@@ -1233,22 +1218,22 @@ export default function ExecutiveDashboardPage() {
                       <RefreshCw size={24} className="animate-spin text-indigo-500 mx-auto" />
                       <div className="text-xs font-mono text-slate-500 dark:text-zinc-400">Loading messages from Gmail...</div>
                     </div>
-                  ) : !googleStatus.connected && inboxEmails.length === 0 ? (
+                  ) : (!googleStatus.connected || !googleStatus.hasOAuth) && inboxEmails.length === 0 ? (
                     <div className="py-16 text-center space-y-3 px-6">
                       <Mail size={32} className="text-slate-400 dark:text-zinc-600 mx-auto" />
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white font-mono">Google Account Not Connected</h4>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white font-mono">Personal Gmail Not Connected</h4>
                       <p className="text-xs text-slate-500 dark:text-zinc-400 font-mono">
-                        Connect your Google Workspace account to preview and read live Gmail communications.
+                        Authorize your personal Google account (saikeerthanmedisetty686@gmail.com) to read live emails and dispatch responses.
                       </p>
                       <button
                         type="button"
                         onClick={() => {
-                          window.location.assign('/api/auth/google');
+                          window.location.assign('/api/auth/google?returnTo=/dashboard');
                         }}
                         className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-mono font-semibold shadow-md transition-all mt-2 cursor-pointer"
                       >
                         <Sparkles size={13} />
-                        <span>Connect Google Workspace</span>
+                        <span>Connect Personal Google Account</span>
                       </button>
                     </div>
                   ) : filteredEmails.length === 0 ? (

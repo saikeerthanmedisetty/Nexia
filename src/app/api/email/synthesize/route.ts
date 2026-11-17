@@ -94,7 +94,7 @@ async function synthesizeSingleEmail(email: EmailItem): Promise<SynthesizedEmail
   }
 
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash-lite',
+    model: 'gemini-1.5-flash',
   });
 
   const prompt = `You are the Executive Communications Director for Sai Keerthan.

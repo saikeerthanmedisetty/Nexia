@@ -298,57 +298,112 @@ function parseMeetingParams(params: AgentExecutionParams) {
     const act = (params.action || '').toLowerCase();
     const googleStatus = await isGoogleConnected();
 
-    if (googleStatus.connected) {
+    if (!googleStatus.connected || !googleStatus.hasOAuth) {
       if (act.includes('send') || act.includes('dispatch') || act.includes('outbound')) {
-        const to = params.to || params.recipient;
-        const subject = params.subject || 'Executive Notification';
-        const body = params.body || params.message || '';
-
-        try {
-          const res = await sendGmailMessage({ to, subject, body });
-          await recordTask({
-            agentId: 'EMAIL',
-            action: 'send',
-            title: `Sent Email: ${subject}`,
-            status: 'completed',
-            details: `Dispatched to ${to} via official Gmail API`,
-            durationMs: 340,
-            params: { to, subject },
-            result: res,
-          });
-
-          return {
-            success: true,
-            data: {
-              status: 'sent',
-              message: `✅ **Email Dispatched Successfully!**\n\n• **Recipient:** ${to}\n• **Subject:** ${subject}\n• **Sender:** ${googleStatus.email}\n• **Status:** Delivered to recipient ✅`,
-            },
-          };
-        } catch (mailErr: any) {
-          console.warn('[agents.ts] Gmail send notice:', mailErr?.message);
-        }
+        return {
+          success: false,
+          error: 'google_not_connected',
+          data: {
+            status: 'unauthenticated',
+            message: `⚠️ **Personal Gmail Not Connected**\n\nYour personal Gmail account is not yet authorized to send emails. Please click **Connect Personal Google Account** on the [Executive Dashboard](/dashboard) or visit [/api/auth/google](/api/auth/google) to authorize live email dispatch.`,
+          },
+        };
       }
 
-      if (act.includes('unread') || act.includes('check') || act.includes('inbox') || act.includes('list')) {
-        try {
-          const unreadCount = await getGmailUnreadCount();
-          const recent = await listRecentEmails(5);
-          const emailList = recent.map(m => `• **${m.subject}** from *${m.from}* (${m.isUnread ? '🔴 Unread' : 'Read'})`).join('\n');
-          const statusMessage = unreadCount > 0
-            ? `📬 **Inbox Update (${googleStatus.email})**\n\nYou have **${unreadCount} unread message${unreadCount === 1 ? '' : 's'}**.\n\n**Recent Activity:**\n${emailList || 'No recent messages'}`
-            : `📬 **Inbox Update (${googleStatus.email})**\n\nYour inbox is completely caught up with 0 unread messages.\n\n**Recent Activity:**\n${emailList || 'No recent messages'}`;
+      return {
+        success: true,
+        data: {
+          status: 'unauthenticated',
+          unreadCount: 0,
+          messages: [],
+          message: `📬 **Personal Gmail Not Connected**\n\nYour personal Gmail inbox is not currently connected. To read your real emails and check live unread counts, please click **Connect Personal Google Account** on the [Executive Dashboard](/dashboard) or authorize via [/api/auth/google](/api/auth/google).`,
+        },
+      };
+    }
+
+    if (act.includes('send') || act.includes('dispatch') || act.includes('outbound')) {
+      const to = params.to || params.recipient;
+      const subject = params.subject || 'Executive Notification';
+      const body = params.body || params.message || '';
+
+      try {
+        const res = await sendGmailMessage({ to, subject, body });
+        if (!res.success) {
           return {
-            success: true,
+            success: false,
+            error: res.error || 'Failed to dispatch email',
             data: {
-              status: 'success',
-              unreadCount,
-              messages: recent,
-              message: statusMessage,
+              status: 'failed',
+              message: `⚠️ **Email Dispatch Failed**\n\n${res.error || 'Unable to send message via Gmail API. Please verify account permissions.'}`,
             },
           };
-        } catch (inboxErr: any) {
-          console.warn('[agents.ts] Gmail inbox query notice:', inboxErr?.message);
         }
+
+        await recordTask({
+          agentId: 'EMAIL',
+          action: 'send',
+          title: `Sent Email: ${subject}`,
+          status: 'completed',
+          details: `Dispatched to ${to} via official Gmail API (Message ID: ${res.messageId})`,
+          durationMs: 340,
+          params: { to, subject },
+          result: res,
+        });
+
+        return {
+          success: true,
+          data: {
+            status: 'sent',
+            messageId: res.messageId,
+            message: `✅ **Email Dispatched Successfully!**\n\n• **Recipient:** ${to}\n• **Subject:** ${subject}\n• **Sender:** ${googleStatus.email}\n• **Status:** Delivered to recipient via Gmail API ✅`,
+          },
+        };
+      } catch (mailErr: any) {
+        console.warn('[agents.ts] Gmail send notice:', mailErr?.message);
+        return {
+          success: false,
+          error: mailErr?.message || 'Failed to send email',
+          data: {
+            status: 'error',
+            message: `⚠️ **Email Send Error:** ${mailErr?.message || 'Encountered an issue communicating with Gmail API.'}`,
+          },
+        };
+      }
+    }
+
+    if (act.includes('unread') || act.includes('check') || act.includes('inbox') || act.includes('list') || act.includes('read')) {
+      try {
+        const unreadCount = await getGmailUnreadCount();
+        const recent = await listRecentEmails(5);
+        const emailList = recent.length > 0
+          ? recent.map(m => `• **${m.subject}** from *${m.from}* (${m.isUnread ? '🔴 Unread' : 'Read'})`).join('\n')
+          : '• *No messages currently in primary inbox.*';
+
+        const statusMessage = unreadCount > 0
+          ? `📬 **Inbox Update (${googleStatus.email})**\n\nYou have **${unreadCount} unread message${unreadCount === 1 ? '' : 's'}**.\n\n**Recent Activity:**\n${emailList}`
+          : `📬 **Inbox Update (${googleStatus.email})**\n\nYour inbox is completely caught up with 0 unread messages.\n\n**Recent Activity:**\n${emailList}`;
+
+        return {
+          success: true,
+          data: {
+            status: 'success',
+            unreadCount,
+            messages: recent,
+            message: statusMessage,
+          },
+        };
+      } catch (inboxErr: any) {
+        console.warn('[agents.ts] Gmail inbox query notice:', inboxErr?.message);
+        return {
+          success: false,
+          error: inboxErr?.message,
+          data: {
+            status: 'error',
+            unreadCount: 0,
+            messages: [],
+            message: `📬 Unable to query live Gmail inbox: ${inboxErr?.message || 'Please check authorization.'}`,
+          },
+        };
       }
     }
   }

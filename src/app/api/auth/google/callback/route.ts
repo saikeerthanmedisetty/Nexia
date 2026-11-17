@@ -54,7 +54,25 @@ export async function GET(req: Request) {
     const returnUrl = state.startsWith('/') ? state : '/dashboard';
     const redirectUrl = new URL(returnUrl, req.url);
     redirectUrl.searchParams.set('google', 'connected');
-    return NextResponse.redirect(redirectUrl);
+
+    const response = NextResponse.redirect(redirectUrl);
+    response.cookies.set('nexia_google_token', encodeURIComponent(JSON.stringify({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      scope: tokens.scope,
+      token_type: tokens.token_type,
+      expiry_date: tokens.expiry_date,
+      userEmail,
+      userName,
+    })), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 3600, // 30 days
+      path: '/',
+    });
+
+    return response;
   } catch (err: any) {
     console.error('[Google Auth Callback] Exchange error:', err);
     return NextResponse.redirect(new URL(`/dashboard?error=${encodeURIComponent(err.message || 'auth_failed')}`, req.url));

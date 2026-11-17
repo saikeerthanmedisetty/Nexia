@@ -114,8 +114,8 @@ export interface IntentClassification {
 }
 
 // Ultra-fast working models verified on Google Generative AI
-const CANDIDATE_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
-const WORKING_MODEL = 'gemini-3.6-flash';
+const CANDIDATE_MODELS = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-flash-latest'];
+const WORKING_MODEL = 'gemini-1.5-flash';
 
 export function isVagueLocation(loc?: string): boolean {
   if (!loc) return true;

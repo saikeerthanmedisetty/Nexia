@@ -253,7 +253,7 @@ Synthesize an ultra-crisp, authoritative 2-sentence executive summary for ${isTo
 STRICT RULE: Currency MUST strictly be formatted in Indian Rupees (₹) with en-IN numbering (e.g. ₹${weeklyBurn.toLocaleString('en-IN')}). NEVER USE DOLLAR SIGNS ($) OR USD.
 `;
 
-    for (const modelName of ['gemini-3.5-flash-lite', 'gemini-3.6-flash']) {
+    for (const modelName of ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']) {
       try {
         const model = genAI.getGenerativeModel({ model: modelName });
         const res = await Promise.race([

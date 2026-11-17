@@ -5,7 +5,7 @@ import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import type { AgentTask } from './AgentActivity';
 import { HITLCard, PendingAction } from './HITLCard';
-import { Bot, Sparkles, Shield, ArrowDown, Brain } from 'lucide-react';
+import { Bot, Sparkles, Shield, ArrowDown, Brain, Calendar, Mail, Receipt, Car, ArrowRight, Briefcase, Video, Search } from 'lucide-react';
 import type { TraceStep } from '@/lib/gemini';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,6 +36,51 @@ export interface ChatWindowProps {
   onStop?: () => void;
   pastSessionCount?: number;
 }
+
+const DEMO_SCENARIOS = [
+  {
+    title: "Executive Morning Dossier",
+    tag: "Chief of Staff",
+    icon: <Briefcase size={13} />,
+    prompt: "Generate my executive morning dossier covering today's calendar, priority inbox items, and expense burn rate",
+  },
+  {
+    title: "Schedule Project Review",
+    tag: "Calendar",
+    icon: <Calendar size={13} />,
+    prompt: "Check if I'm free tomorrow at 3 PM, and if so, schedule a 45-minute project review with Aditya Sir",
+  },
+  {
+    title: "Draft Sprint Update",
+    tag: "Gmail HITL",
+    icon: <Mail size={13} />,
+    prompt: "Draft an email to my team members summarizing today's sprint achievements and asking them to review the code before 6 PM",
+  },
+  {
+    title: "Receipt Vision to Ledger",
+    tag: "Sheets OCR",
+    icon: <Receipt size={13} />,
+    prompt: "Log an academic expense receipt of ₹1,450 for Arduino sensors and jumper wires into my Project Accounts sheet",
+  },
+  {
+    title: "YouTube Video Publishing",
+    tag: "Media Broadcast",
+    icon: <Video size={13} />,
+    prompt: "Stage an unlisted YouTube video upload for our Nexia technical demonstration with custom 16:9 thumbnail and high-CTR SEO tags",
+  },
+  {
+    title: "Transit to Station",
+    tag: "Uber Dispatch",
+    icon: <Car size={13} />,
+    prompt: "Find Uber ride options and fare estimates from Sanjay Ghodawat University main gate to Kolhapur Railway Station for tomorrow 9 AM",
+  },
+  {
+    title: "Multi-Agent Research Dossier",
+    tag: "Deep Research",
+    icon: <Search size={13} />,
+    prompt: "Conduct deep research comparing decentralized multi-agent architectures against centralized coordinators, including fault isolation and SLA metrics",
+  },
+];
 
 export function ChatWindow({ 
   messages, 
@@ -143,12 +188,58 @@ export function ChatWindow({
               initial={{ y: 8, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.35, delay: 0.15 }}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-500/25 text-xs font-mono text-indigo-700 dark:text-indigo-300 mb-6 shadow-xs select-none backdrop-blur-xs"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-500/25 text-xs font-mono text-indigo-700 dark:text-indigo-300 mb-4 shadow-xs select-none backdrop-blur-xs"
             >
               <Brain size={13} className="text-indigo-500 animate-pulse shrink-0" />
               <span>
                 Executive Memory Active • Connected across {pastSessionCount ? `${pastSessionCount} past chats` : 'all your conversations'}
               </span>
+            </motion.div>
+
+            {/* Live Operational Scenarios Grid for Presentation */}
+            <motion.div
+              initial={{ y: 15, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.45, delay: 0.2 }}
+              className="w-full max-w-xl text-left space-y-2 mb-4"
+            >
+              <div className="flex items-center justify-between px-1 mb-1">
+                <span className="text-[11px] font-mono tracking-wider uppercase text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                  <Sparkles size={11} className="text-indigo-500" />
+                  Live Operational Scenarios (Click to Run)
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 font-semibold">
+                  HITL Verified
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {DEMO_SCENARIOS.map((scenario, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => onSendMessage(scenario.prompt)}
+                    className="group relative flex flex-col items-start p-3 rounded-xl border border-slate-200 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/70 hover:bg-indigo-50/70 dark:hover:bg-indigo-950/30 hover:border-indigo-300 dark:hover:border-indigo-500/50 shadow-xs hover:shadow-md transition-all duration-200 text-left cursor-pointer overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between w-full mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="p-1 rounded-md bg-indigo-100 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform">
+                          {scenario.icon}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          {scenario.title}
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
+                        {scenario.tag}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed font-sans">
+                      "{scenario.prompt}"
+                    </p>
+                  </button>
+                ))}
+              </div>
             </motion.div>
 
             {/* Memory badge sits above input with clean breathing room */}

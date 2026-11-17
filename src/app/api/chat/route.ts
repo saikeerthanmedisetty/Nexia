@@ -283,7 +283,7 @@ export async function POST(req: Request) {
             const { GoogleGenerativeAI } = await import('@google/generative-ai');
             const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || '');
             let dynamicParsed: any = null;
-            const modelsToTry = ['gemini-3.5-flash-lite', 'gemini-3.6-flash'];
+            const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
 
             for (const mName of modelsToTry) {
               try {
@@ -334,7 +334,7 @@ Output strictly valid JSON matching:
                   // Brief backoff and retry once
                   await new Promise(r => setTimeout(r, 2000));
                   try {
-                    const retryModel = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+                    const retryModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
                     const retryRes = await retryModel.generateContent(`User Prompt: ${cleanPrompt}\nSynthesize an authoritative research brief with key insights, comparison table, and verified industry citations.`);
                     const retryText = retryRes.response.text().trim();
                     if (retryText.length > 50) {
@@ -559,7 +559,7 @@ Output strictly valid JSON matching:
 
             const { GoogleGenerativeAI } = await import('@google/generative-ai');
             const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || '');
-            const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
             const summaryPrompt = `You are an expert video intelligence analyst for Sai Keerthan.
 Analyze and provide a comprehensive executive intelligence summary for this YouTube video request:

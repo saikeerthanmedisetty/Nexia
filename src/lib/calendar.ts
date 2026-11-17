@@ -1148,11 +1148,6 @@ export async function getCalendarEvents(options?: {
 
   let allEvents = deduplicateEvents(Array.from(inMemoryEvents.values()), isGoogleActive);
 
-  if (allEvents.length === 0 && !isGoogleActive) {
-    seedDefaultExecutiveEvents();
-    allEvents = deduplicateEvents(Array.from(inMemoryEvents.values()), isGoogleActive);
-  }
-
   if (resolvedOptions?.date) {
     return allEvents.filter((e) => e.date === resolvedOptions.date);
   }
