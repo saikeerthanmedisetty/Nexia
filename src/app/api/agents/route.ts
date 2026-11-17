@@ -82,20 +82,9 @@ export async function POST(req: Request) {
 
     if (normalizedAction === 'telemetry') {
       executionParams.status = 'accepted';
-      executionParams.driver = params?.driver || {
-        name: 'Assigned Driver',
-        phone_number: '+91 98765 43210',
-        rating: '4.92'
-      };
-      executionParams.vehicle = params?.vehicle || {
-        make_model: 'Fleet Vehicle',
-        license_plate: params?.vehicle?.license_plate || 'Commercial Vehicle',
-        color: 'Silver'
-      };
-      executionParams.eta = params?.eta || 3;
     } else if (normalizedAction === 'cancel') {
       executionParams.status = 'driver_canceled';
-      executionParams.cancellation_reason = params?.cancellation_reason || 'Driver vehicle puncture';
+      executionParams.cancellation_reason = params?.cancellation_reason || 'User cancelled request';
     } else if (normalizedAction === 'complete') {
       executionParams.status = 'completed';
     }
@@ -171,24 +160,15 @@ export async function POST(req: Request) {
           message = `💳 **Financial Ledger Updated!**\n\nSuccessfully recorded **${amt}**${cat} to your Executive Financial Vault.\n\n• **Date:** ${params?.date || new Date().toISOString().split('T')[0]}\n• **Merchant / Vendor:** ${params?.merchant || 'Direct'}\n${statusLine}`;
         }
       } else if (agentId === 'UBER') {
-        const bId = result.data?.booking_id || result.data?.['Booking ID'] || params?.booking_id || 'UBER-DISPATCH';
-        const tier = result.data?.tier || result.data?.Tier || params?.selected_tier || 'Uber Premier AC';
-        const pickup = result.data?.pickup || result.data?.Pickup || params?.pickup || 'Current Location';
-        const destination = result.data?.destination || result.data?.Destination || params?.destination || 'Dropoff Location';
-        const fare = result.data?.fare || result.data?.Fare || params?.locked_fare || (params?.fare ? `₹${params.fare}` : 'Dynamic Tariff');
-        const driverName = params?.driver?.name || 'Assigned Driver';
-        const driverRating = params?.driver?.rating || '4.9';
-        const vehicleInfo = params?.vehicle?.make_model ? `${params.vehicle.make_model} [${params.vehicle.license_plate || 'Live'}]` : 'Fleet Vehicle';
-        const distanceStr = params?.distance || (params?.distance_km ? `${params.distance_km} km` : 'Dynamic Route');
-
-        if (normalizedAction === 'telemetry') {
-          message = `📡 **Live Ride Telemetry Synced**\n\n• **Status:** \`ACCEPTED\` 🟢\n• **Route:** ${pickup} ➔ ${destination}\n• **Driver:** ${driverName} (${driverRating}⭐)\n• **Vehicle:** ${vehicleInfo}\n• **Live ETA:** ${params?.eta || 3} mins\n• **Status:** Confirmed & Updated ✅`;
-        } else if (normalizedAction === 'complete') {
-          message = `🏁 **Trip Successfully Completed**\n\n• **Booking ID:** \`${bId}\`\n• **Status:** \`COMPLETED\` ✅\n• **Route:** ${pickup} ➔ ${destination}\n• **Driver:** ${driverName} (${vehicleInfo})\n• **Trip Distance:** ${distanceStr}\n• **Final Metered Fare:** ${fare}\n• **Receipt:** Dispatched to \`+91 70131 84197\` 📲\n\n⭐ *Trip finalized and archived.*`;
-        } else if (normalizedAction === 'cancel') {
-          message = `🛡️ **Driver Reassigned**\n\n• **Notice:** Initial driver unavailable (${params?.cancellation_reason || 'Route rescheduling'})\n• **Route Protected:** ${pickup} ➔ ${destination}\n• **Update:** Seamlessly re-assigned nearby replacement driver for booking \`${bId}\`.`;
+        if (result.data?.message) {
+          message = result.data.message;
         } else {
-          message = result.data?.message || `🚗 **Mobility Dispatch Confirmed!**\n\n• **Booking Reference:** \`${bId}\`\n• **Service Tier:** ${tier}\n• **Pickup:** ${pickup}\n• **Destination:** ${destination}\n• **Estimated Tariff:** ${fare}\n• **Payment Method:** 💵 Cash on Arrival\n• **Status:** 🟢 Driver Dispatched (En route to pickup)`;
+          const tier = result.data?.tier || params?.selected_tier || 'Uber Go';
+          const pickup = result.data?.pickup || params?.pickup || 'SGU Main Gate';
+          const destination = result.data?.destination || params?.destination || 'Kolhapur Railway Station';
+          const fare = result.data?.fare || params?.locked_fare || '₹380 – ₹450';
+          const bookingUrl = result.data?.bookingUrl || `https://m.uber.com/ul/?action=setPickup&pickup[formatted_address]=${encodeURIComponent(pickup)}&dropoff[formatted_address]=${encodeURIComponent(destination)}`;
+          message = `🚗 **Mobility Dispatch Configured**\n\n• **Pickup:** ${pickup}\n• **Destination:** ${destination}\n• **Tier:** ${tier}\n• **Estimated Tariff:** ${fare}\n\n📲 **[Open Official Uber App to Finalize Booking](${bookingUrl})**`;
         }
       } else if (agentId === 'YOUTUBE') {
         if (result.data?.message) {

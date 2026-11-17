@@ -230,6 +230,10 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
   const handleConfirm = async () => {
     setIsExecuting(true);
     try {
+      if (isUber && p.bookingUrl && typeof window !== 'undefined') {
+        window.open(p.bookingUrl, '_blank', 'noopener,noreferrer');
+      }
+
       const finalParams = isEmail ? {
         ...action.params,
         to: editableTo,
@@ -358,8 +362,8 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
   } else if (isUber) {
     heroMain = p.locked_fare || (p.fare ? `₹${p.fare}` : 'Dynamic Tariff');
     heroSub = `${p.pickup || 'Current Location'} ➔ ${p.destination || 'Destination'}`;
-    heroCategory = p.selected_tier || p.tier || 'Uber Premier AC';
-    heroMerchant = p.driver?.name ? `${p.driver.name} (Driver)` : 'On-Demand Dispatch';
+    heroCategory = p.selected_tier || p.tier || 'Uber Go';
+    heroMerchant = p.routeVia ? `${p.distance || '19.5 km'} via ${p.routeVia}` : (p.distance ? `${p.distance} Route` : 'Official Uber Route');
   } else {
     // Universal fallback for ANY future or arbitrary agent/task
     heroMain = 
@@ -856,7 +860,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
                       : isCalendar
                       ? ((p.hasConflict || p.conflict) ? '[ OVERRIDE & SCHEDULE ]' : '[ CONFIRM & SCHEDULE ]')
                       : isUber
-                      ? '[ AUTHORIZE DISPATCH ]'
+                      ? '[ AUTHORIZE DISPATCH & OPEN UBER ]'
                       : `[ CONFIRM & ${action.action?.toUpperCase() || 'EXECUTE'} ]`}
                   </span>
                 </>
@@ -890,7 +894,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
                 : isCalendar
                 ? 'Event confirmed and added to your Executive Schedule! ✅'
                 : isUber
-                ? 'Ride confirmed and dispatched! Driver is en route. ✅'
+                ? 'Ride parameters verified! Official Uber App launched with pre-filled route. 🚗'
                 : 'Action confirmed and executed successfully! ✅'}
             </span>
           </div>
@@ -1047,8 +1051,20 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-400">Vehicle Tier:</span>
-                  <span className="text-amber-400 font-semibold">{p.selected_tier || p.tier || 'Uber Premier AC'}</span>
+                  <span className="text-amber-400 font-semibold">{p.selected_tier || p.tier || 'Uber Go'}</span>
                 </div>
+                {p.distance && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-400">Route Metric:</span>
+                    <span className="text-zinc-300 font-mono text-[10px]">{p.distance} (~{p.duration || '35 mins'})</span>
+                  </div>
+                )}
+                {p.scheduledTime && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-400">Scheduled:</span>
+                    <span className="text-indigo-300 font-mono text-[10px]">{p.scheduledTime}</span>
+                  </div>
+                )}
               </>
             )}
 
@@ -1219,20 +1235,22 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
             {isUber && (
               <>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Locked Tariff:</span>
+                  <span className="text-zinc-400">Estimated Tariff:</span>
                   <span className="text-emerald-400 font-semibold">{p.locked_fare || (p.fare ? `₹${p.fare}` : 'Dynamic Tariff')}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Dispatch Protocol:</span>
-                  <span className="text-indigo-300">Corporate Profile</span>
+                  <span className="text-zinc-400">Dispatch Mode:</span>
+                  <span className="text-indigo-300">Official Uber App</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Driver Security PIN:</span>
-                  <span className="text-zinc-300">Enforced 🔒</span>
+                  <span className="text-zinc-400">Corridor Route:</span>
+                  <span className="text-zinc-300 truncate max-w-[140px]">{p.routeVia || 'NH 166 Highway'}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-400">Fleet Availability:</span>
-                  <span className="text-emerald-400">High Density (2-4 min ETA)</span>
+                  <span className={p.isRegionalTier2 ? "text-amber-300 text-[10px]" : "text-emerald-400 text-[10px]"}>
+                    {p.isRegionalTier2 ? 'Intermittent Cabs / Local Auto' : 'High Density On-Demand'}
+                  </span>
                 </div>
               </>
             )}

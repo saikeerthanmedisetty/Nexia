@@ -152,6 +152,88 @@ export async function executeAgent(
     return { success: false, error: `Agent ${agentId} not found` };
   }
 
+  // ─── Native Autonomous Mobility Execution (Zero Webhook Latency) ───
+  if (agentId === 'UBER') {
+    const { calculateMobilityRoute, formatMobilityResponse } = await import('./mobility');
+    const pickupRaw = (params.pickup || params.from || 'Sanjay Ghodawat University Main Gate').toString();
+    const destinationRaw = (params.destination || params.to || 'Kolhapur Railway Station').toString();
+    const route = calculateMobilityRoute(pickupRaw, destinationRaw);
+    const act = (params.action || '').toLowerCase();
+    const tier = (params.selected_tier || params.tier || 'Uber Go').toString();
+    const selectedTierObj = route.tiers.find(t => t.name.toLowerCase().includes(tier.toLowerCase())) || route.tiers[1];
+
+    if (act.includes('estimate') || act.includes('fare') || act.includes('price') || act.includes('option') || act.includes('tariff')) {
+      const message = formatMobilityResponse(route, tier);
+      return {
+        success: true,
+        data: {
+          status: 'success',
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
+          distance_km: route.distanceKm,
+          duration_mins: route.durationMins,
+          route_via: route.routeVia,
+          scheduled_time: route.scheduledTime,
+          is_regional: route.isRegionalTier2,
+          region_name: route.regionName,
+          tiers: route.tiers,
+          bookingUrl: route.bookingUrl,
+          message,
+        },
+      };
+    }
+
+    if (act.includes('telemetry') || act.includes('track') || act.includes('status')) {
+      const regionalNotice = route.isRegionalTier2
+        ? `\n\n📍 *Regional Note: In ${route.regionName}, on-demand Uber cabs operate with intermittent driver availability. Local auto-rickshaws stationed at ${route.cleanPickup} or city cabs provide 24/7 immediate transit along NH 166.*`
+        : '';
+      return {
+        success: true,
+        data: {
+          status: 'verified_route',
+          booking_id: params.booking_id || 'UBER-ROUTE-VERIFIED',
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
+          distance: `${route.distanceKm} km`,
+          duration: `${route.durationMins} mins via ${route.routeVia}`,
+          bookingUrl: route.bookingUrl,
+          message: `📡 **Mobility Telemetry & Route Verified**\n\n• **Route:** ${route.cleanPickup} ➔ ${route.cleanDestination}\n• **Verified Distance:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : ''}\n• **Service Tier:** ${selectedTierObj.name} (Estimated: ₹${selectedTierObj.minFare} – ₹${selectedTierObj.maxFare})\n\n🔗 **[Open Official Uber App to Match Active Drivers](${route.bookingUrl})**${regionalNotice}`,
+        },
+      };
+    }
+
+    if (act.includes('cancel')) {
+      return {
+        success: true,
+        data: {
+          status: 'cancelled',
+          message: `🛡️ **Ride Request Cancelled**\n\nThe pending ride request for ${route.cleanPickup} ➔ ${route.cleanDestination} has been cancelled. No charges were incurred.`,
+        },
+      };
+    }
+
+    // Default: Dispatch / Booking confirmation
+    const regionalNotice = route.isRegionalTier2
+      ? `\n\n⚠️ **Kolhapur & SGU Regional Transit Intelligence:**\n• In Atigre / Kolhapur highway corridors, on-demand Uber Go cabs have limited availability.\n• Local Auto-Rickshaws (stationed at SGU Main Gate) and private City Taxis operate 24/7 along NH 166.\n• Click below to match live drivers currently active in your sector in the official Uber app.`
+      : '';
+
+    return {
+      success: true,
+      data: {
+        status: 'dispatched_ready',
+        booking_id: params.booking_id || `UBER-${Date.now().toString(36).toUpperCase()}`,
+        pickup: route.cleanPickup,
+        destination: route.cleanDestination,
+        tier: selectedTierObj.name,
+        fare: `₹${selectedTierObj.minFare} – ₹${selectedTierObj.maxFare}`,
+        distance: `${route.distanceKm} km`,
+        duration: `${route.durationMins} mins`,
+        bookingUrl: route.bookingUrl,
+        message: `🚗 **Mobility Dispatch Configured**\n\n• **Pickup:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Service Tier:** ${selectedTierObj.name}\n• **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Scheduled Departure:** ${route.scheduledTime}` : ''}\n• **Estimated Tariff:** ₹${selectedTierObj.minFare} – ₹${selectedTierObj.maxFare}\n\n📲 **[Launch Official Uber App to Finalize Driver Match](${route.bookingUrl})**${regionalNotice}`,
+      },
+    };
+  }
+
   let webhookUrl = agent.n8nWebhookUrl;
   if (agentId === 'UBER') {
     const act = (params.action || '').toLowerCase();
@@ -1905,62 +1987,6 @@ function parseMeetingParams(params: AgentExecutionParams) {
             data: {
               status: 'saved_locally',
               message: `✅ **Expense Recorded to Ledger**\n\n• **Amount:** ₹${params.amount}\n• **Merchant:** ${params.merchant || 'Direct Entry'}\n• **Category:** ${params.category || 'General'}\n• **Date:** ${params.date || new Date().toISOString().split('T')[0]}`,
-            },
-          };
-        }
-        if (agentId === 'UBER') {
-          if (actionName.includes('telemetry') || actionName.includes('track') || actionName.includes('status')) {
-            const driver = params.driver || {
-              name: 'Vikram Singh',
-              phone_number: '+91 98765 43210',
-              rating: '4.92'
-            };
-            const vehicle = params.vehicle || {
-              make_model: 'Maruti Suzuki Dzire',
-              license_plate: 'KA 03 AB 1234',
-              color: 'Silver'
-            };
-            const eta = params.eta || 4;
-            return {
-              success: true,
-              data: {
-                status: 'accepted',
-                booking_id: params.booking_id || 'UBER-IND-LIVE-01',
-                pickup: params.pickup || 'Current Location',
-                destination: params.destination || 'Destination',
-                driver,
-                vehicle,
-                eta,
-                message: `🚗 **Uber Ride Status: Driver Arriving**\n\n• **Driver:** ${driver.name} (⭐ ${driver.rating})\n• **Vehicle:** ${vehicle.make_model} (${vehicle.license_plate})\n• **ETA:** ${eta} mins away\n• **Pickup:** ${params.pickup || 'Current Location'}`,
-              },
-            };
-          }
-          if (actionName.includes('cancel')) {
-            return {
-              success: true,
-              data: {
-                status: 'driver_canceled',
-                booking_id: params.booking_id || 'UBER-IND-LIVE-01',
-                cancellation_reason: params.cancellation_reason || 'Driver vehicle puncture',
-                message: `⚠️ **Uber Ride Update**\n\nRide canceled: ${params.cancellation_reason || 'Driver vehicle puncture'}. A new ride can be requested immediately.`,
-              },
-            };
-          }
-          const destination = params.destination || 'Destination';
-          const pickup = params.pickup || 'Current Location';
-          const tier = params.tier || params.selected_tier || 'Uber Go';
-          const fare = Number(params.fare) || 250;
-          const bookingUrl = `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodeURIComponent(destination)}`;
-          return {
-            success: true,
-            data: {
-              status: 'success',
-              pickup,
-              destination,
-              tier,
-              fare,
-              bookingUrl,
-              message: `🚗 **Uber Ride Route Prepared**\n\n• **Pickup:** ${pickup}\n• **Destination:** ${destination}\n• **Tier:** ${tier}\n• **Estimated Fare:** ₹${Math.round(fare * 0.85)} – ₹${Math.round(fare * 1.15)}\n\n[Open Uber App to Confirm & Dispatch](${bookingUrl})`,
             },
           };
         }

@@ -26,6 +26,11 @@ import {
   createRecurringCalendarEvents,
   updateCalendarEvent
 } from './calendar';
+import {
+  calculateMobilityRoute,
+  formatMobilityResponse,
+  extractCleanLocationAndSchedule
+} from './mobility';
 
 export { sanitizeExecutiveTerminology };
 
@@ -1036,62 +1041,47 @@ export function preRouteDeterministicIntent(
 
   if (isUberEstimate || isUberBooking) {
     let detectedTier = 'Uber Go';
-    let baseFare = 50;
-    let perKm = 15.5;
     let explicitlySpecifiedTier: string | null = null;
 
     if (lower.includes('bike') || lower.includes('moto') || lower.includes('motorcycle') || lower.includes('scooter') || lower.includes('two wheeler')) {
       detectedTier = 'Uber Moto';
       explicitlySpecifiedTier = 'Uber Moto';
-      baseFare = 25;
-      perKm = 8.0;
     } else if (lower.includes('auto') || lower.includes('rickshaw') || lower.includes('tuk tuk') || lower.includes('three wheeler')) {
       detectedTier = 'Uber Auto';
       explicitlySpecifiedTier = 'Uber Auto';
-      baseFare = 35;
-      perKm = 11.5;
     } else if (lower.includes('premier') || lower.includes('comfort') || lower.includes('sedan') || lower.includes('luxury')) {
       detectedTier = 'Uber Premier';
       explicitlySpecifiedTier = 'Uber Premier';
-      baseFare = 80;
-      perKm = 21.0;
     } else if (lower.includes('xl') || lower.includes('suv') || lower.includes('innova') || lower.includes('ertiga') || lower.includes('6 seater')) {
       detectedTier = 'Uber XL';
       explicitlySpecifiedTier = 'Uber XL';
-      baseFare = 100;
-      perKm = 25.0;
     } else if (lower.includes('uber go') || lower.includes('go ac') || (lower.includes(' go') && !lower.includes('ahead'))) {
       detectedTier = 'Uber Go';
       explicitlySpecifiedTier = 'Uber Go';
-      baseFare = 50;
-      perKm = 15.5;
     }
 
-    let pickup = '';
-    let destination = '';
-
-    const cleanLocation = (loc: string): string => {
-      return loc
-        .replace(/(?:in an auto|by bike|by auto|in uber|by uber|in cab|by cab|please|now|fast|urgently)$/i, '')
-        .replace(/[,\.\?!]+$/, '')
-        .trim();
-    };
+    let pickupRaw = '';
+    let destinationRaw = '';
 
     const fromToMatch = trimmed.match(/(?:from|pickup(?:\s*at)?)\s+([^,\.\n\?]+?)\s+(?:to|heading to|drop(?:\s*off)?(?:\s*at)?)\s+([^,\.\n\?]+)/i);
     const toFromMatch = trimmed.match(/(?:to|heading to|drop(?:\s*off)?(?:\s*at)?)\s+([^,\.\n\?]+?)\s+(?:from|pickup(?:\s*at)?)\s+([^,\.\n\?]+)/i);
 
     if (fromToMatch) {
-      pickup = cleanLocation(fromToMatch[1]);
-      destination = cleanLocation(fromToMatch[2]);
+      pickupRaw = fromToMatch[1];
+      destinationRaw = fromToMatch[2];
     } else if (toFromMatch) {
-      destination = cleanLocation(toFromMatch[1]);
-      pickup = cleanLocation(toFromMatch[2]);
+      destinationRaw = toFromMatch[1];
+      pickupRaw = toFromMatch[2];
     } else {
       const toMatch = trimmed.match(/(?:to|heading to|drop(?:\s*off)?(?:\s*at)?)\s+([^,\.\n\?]+)/i);
       const fromMatch = trimmed.match(/(?:from|pickup(?:\s*at)?)\s+([^,\.\n\?]+)/i);
-      if (toMatch) destination = cleanLocation(toMatch[1]);
-      if (fromMatch) pickup = cleanLocation(fromMatch[1]);
+      if (toMatch) destinationRaw = toMatch[1];
+      if (fromMatch) pickupRaw = fromMatch[1];
     }
+
+    const { location: pickup, scheduledTime: pTime } = extractCleanLocationAndSchedule(pickupRaw);
+    const { location: destination, scheduledTime: dTime } = extractCleanLocationAndSchedule(destinationRaw);
+    const scheduledTime = dTime || pTime;
 
     const hasVagueEndpoints = !pickup || !destination || isVagueLocation(pickup) || isVagueLocation(destination);
 
@@ -1109,7 +1099,7 @@ export function preRouteDeterministicIntent(
           `1. **Specific Pickup:** Please provide your exact pickup landmark or address and city (e.g., *Campus Gate 1, Bangalore* or *SGU Main Gate, Kolhapur*).\n` +
           `2. **Specific Destination:** Please provide your exact destination or airport terminal with city (e.g., *Airport Terminal 1* or *City Railway Station*).\n` +
           `3. **Service Tier:** ${explicitlySpecifiedTier ? `You specified **${explicitlySpecifiedTier}**.` : 'Select which vehicle type you prefer:'}\n` +
-          `   • 🛺 **Uber Auto** — Budget 3-wheeler for quick city transit\n` +
+          `   • 🛺 **Uber Auto / Local Auto** — Budget 3-wheeler for quick city transit\n` +
           `   • 🚗 **Uber Go** — Affordable compact 4-seater with AC\n` +
           `   • 🚘 **Uber Premier** — Premium executive sedan\n` +
           `   • 🚐 **Uber XL** — 6-seater SUV for luggage or groups\n` +
@@ -1119,45 +1109,28 @@ export function preRouteDeterministicIntent(
       }, pendingAction, channelName);
     }
 
-    let hash = 0;
-    const key = `${pickup.toLowerCase()}->${destination.toLowerCase()}`;
-    for (let i = 0; i < key.length; i++) {
-      hash = (hash << 5) - hash + key.charCodeAt(i);
-      hash |= 0;
-    }
-    const distanceKm = parseFloat((5.0 + Math.abs(hash % 20) + ((key.length % 5) * 1.2)).toFixed(1));
+    const route = calculateMobilityRoute(pickupRaw, destinationRaw);
 
     if (isUberEstimate) {
-      const tiers = [
-        { name: 'Uber Auto', icon: '🛺', base: 35, perKm: 11.5, speed: 2.5, minKm: 0, maxKm: 25 },
-        { name: 'Uber Go', icon: '🚗', base: 50, perKm: 15.5, speed: 2.2, minKm: 0, maxKm: 100 },
-        { name: 'Uber Premier', icon: '🚘', base: 80, perKm: 21.0, speed: 2.1, minKm: 0, maxKm: 100 },
-        { name: 'Uber XL', icon: '🚐', base: 100, perKm: 25.0, speed: 2.3, minKm: 0, maxKm: 100 },
-        { name: 'Uber Moto', icon: '🏍️', base: 25, perKm: 8.0, speed: 1.6, minKm: 0, maxKm: 20 },
-      ];
-
-      const available = tiers.filter(t => distanceKm >= t.minKm && distanceKm <= t.maxKm);
-      const rows = available.map(t => {
-        const fare = Math.round(t.base + distanceKm * t.perKm);
-        const low = Math.round(fare * 0.95);
-        const high = Math.round(fare * 1.15);
-        const mins = Math.round(distanceKm * t.speed + 4);
-        return `| ${t.icon} **${t.name}** | ₹${low} – ₹${high} | ~${mins} mins |`;
-      }).join('\n');
-
+      const response = formatMobilityResponse(route, explicitlySpecifiedTier || undefined);
       return attachSafetyAndTraces({
         type: 'general',
         agent: 'UBER',
         action: 'estimate',
-        params: { pickup, destination, distanceKm },
-        response: `🚗 **Mobility Tariff Estimates**\n\n` +
-          `• **Route:** ${pickup} ➔ ${destination}\n` +
-          `• **Estimated Distance:** ${distanceKm} km\n\n` +
-          `| Service Tier | Estimated Tariff | Travel Time |\n` +
-          `| :--- | :--- | :--- |\n` +
-          rows +
-          `\n\n💡 *To book any option, simply reply with your preferred tier (e.g., **"Book Uber Go from ${pickup} to ${destination}"**).*`,
-        explanation: `Calculated multi-tier mobility tariffs for ${pickup} to ${destination} (${distanceKm} km).`,
+        params: {
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
+          scheduledTime: route.scheduledTime,
+          distanceKm: route.distanceKm,
+          durationMins: route.durationMins,
+          routeVia: route.routeVia,
+          bookingUrl: route.bookingUrl,
+          isRegionalTier2: route.isRegionalTier2,
+          regionName: route.regionName,
+          tiers: route.tiers,
+        },
+        response,
+        explanation: `Calculated verified route distance and realistic tariffs for ${route.cleanPickup} to ${route.cleanDestination} (${route.distanceKm} km via ${route.routeVia}).`,
       }, pendingAction, channelName);
     }
 
@@ -1166,29 +1139,31 @@ export function preRouteDeterministicIntent(
         type: 'general',
         agent: 'UBER',
         action: 'clarify_tier',
-        params: { pickup, destination },
+        params: {
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
+          distanceKm: route.distanceKm,
+          bookingUrl: route.bookingUrl,
+        },
         response: `🚗 **Please Select a Vehicle Tier to Authorize Dispatch**\n\n` +
-          `• **Route:** ${pickup} ➔ ${destination} (~${distanceKm} km)\n\n` +
-          `Which vehicle type would you like to book?\n` +
-          `• 🛺 **Uber Auto** (Budget 3-wheeler)\n` +
-          `• 🚗 **Uber Go** (Compact AC 4-seater)\n` +
-          `• 🚘 **Uber Premier** (Executive sedan)\n` +
-          `• 🚐 **Uber XL** (6-seater SUV)\n` +
-          `• 🏍️ **Uber Moto** (Fast 2-wheeler)\n\n` +
+          `• **Route:** ${route.cleanPickup} ➔ ${route.cleanDestination} (~${route.distanceKm} km via ${route.routeVia})\n\n` +
+          `Which vehicle type would you like to dispatch?\n` +
+          `• 🛺 **Uber Auto / Local Auto** (Budget 3-wheeler: ₹${route.tiers[0].minFare} – ₹${route.tiers[0].maxFare})\n` +
+          `• 🚗 **Uber Go** (Compact AC 4-seater: ₹${route.tiers[1].minFare} – ₹${route.tiers[1].maxFare})\n` +
+          `• 🚘 **Uber Premier** (Executive sedan: ₹${route.tiers[2].minFare} – ₹${route.tiers[2].maxFare})\n` +
+          `• 🚐 **Uber XL** (6-seater SUV: ₹${route.tiers[3].minFare} – ₹${route.tiers[3].maxFare})\n` +
+          `• 🏍️ **Uber Moto** (Solo 2-wheeler: ₹${route.tiers[4].minFare} – ₹${route.tiers[4].maxFare})\n\n` +
           `Reply with your preferred option (e.g., **"Dispatch Uber Go"**) to confirm.`,
         explanation: 'Clarification requested: vehicle tier selection is required before dispatching a ride.',
       }, pendingAction, channelName);
     }
 
-    const durationMins = detectedTier === 'Uber Moto' ? Math.round(distanceKm * 1.6 + 3) : Math.round(distanceKm * 2.2 + 4);
-    const calculatedFare = Math.round(baseFare + distanceKm * perKm);
-    const lockedFare = `₹${Math.round(calculatedFare * 0.95)} - ₹${Math.round(calculatedFare * 1.15)}`;
+    const tierObj = route.tiers.find(t => t.name.toLowerCase().includes(detectedTier.toLowerCase())) || route.tiers[1];
+    const lockedFare = `₹${tierObj.minFare} – ₹${tierObj.maxFare}`;
 
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let suffix = '';
-    for (let i = 0; i < 6; i++) suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-    const activeBookingId = `UBER-IND-${suffix}`;
-    const ridePin = String(Math.floor(1000 + Math.random() * 9000));
+    const regionalNote = route.isRegionalTier2
+      ? `\n\n⚠️ **Kolhapur & SGU Regional Transit Notice:**\n• In Atigre / Kolhapur highway corridors, on-demand cabs operate with intermittent driver density.\n• Local Auto-Rickshaws (stationed at SGU Main Gate) and City Taxis operate 24/7 along NH 166.\n• Confirming below opens the official Uber app pre-filled for 1-click driver matching.`
+      : '';
 
     return attachSafetyAndTraces({
       type: 'action_stage',
@@ -1196,32 +1171,36 @@ export function preRouteDeterministicIntent(
       action: 'book',
       requiresConfirmation: true,
       params: {
-        pickup,
-        destination,
-        selected_tier: detectedTier,
-        tier: detectedTier,
+        pickup: route.cleanPickup,
+        destination: route.cleanDestination,
+        scheduledTime: route.scheduledTime,
+        selected_tier: tierObj.name,
+        tier: tierObj.name,
         locked_fare: lockedFare,
-        fare: calculatedFare,
-        distance: `${distanceKm} km`,
-        duration: `${durationMins} mins`,
-        booking_id: activeBookingId,
-        ride_pin: ridePin,
+        fare: Math.round((tierObj.minFare + tierObj.maxFare) / 2),
+        distance: `${route.distanceKm} km`,
+        duration: `${route.durationMins} mins`,
+        routeVia: route.routeVia,
+        bookingUrl: route.bookingUrl,
+        isRegionalTier2: route.isRegionalTier2,
+        regionName: route.regionName,
         liveMode: true,
         rawPrompt: trimmed,
         userPrompt: trimmed,
       },
-      explanation: `🚗 **Mobility Dispatch Request Staged**\n\nI have locked in your transit route and vehicle parameters:\n\n• **Pickup:** ${pickup}\n• **Destination:** ${destination}\n• **Service Tier:** ${detectedTier}\n• **Estimated Tariff:** ${lockedFare}\n• **Estimated Transit:** ${distanceKm} km (~${durationMins} mins)\n\n*Review route parameters below and authorize dispatch.*`,
+      explanation: `🚗 **Mobility Dispatch Request Staged**\n\nI have verified your transit route and tariff parameters:\n\n• **Pickup:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Service Tier:** ${tierObj.name}\n• **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : ''}\n• **Estimated Tariff:** ${lockedFare}${regionalNote}\n\n*Review parameters below and authorize dispatch to open Uber.*`,
       confirmationDetails: {
-        title: `Dispatch ${detectedTier}`,
-        warning: 'Safety Check: Confirm route and service tier before dispatching driver.',
-        summary: `${detectedTier} • ${pickup} ➔ ${destination} (${lockedFare})`,
+        title: `Dispatch ${tierObj.name}`,
+        warning: 'Safety Check: Review verified route and regional availability before authorizing dispatch.',
+        summary: `${tierObj.name} • ${route.cleanPickup} ➔ ${route.cleanDestination} (${lockedFare})`,
         details: {
-          tier: detectedTier,
-          pickup,
-          destination,
+          tier: tierObj.name,
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
           fare: lockedFare,
-          distance: `${distanceKm} km`,
-          duration: `${durationMins} mins`,
+          distance: `${route.distanceKm} km`,
+          duration: `${route.durationMins} mins`,
+          routeVia: route.routeVia,
         },
       },
     }, pendingAction, channelName);
@@ -2166,75 +2145,59 @@ Return ONLY valid JSON matching the schema.
 
   // E. New Action: UBER
   if (lower.includes('uber') || lower.includes('cab') || lower.includes('ride') || lower.includes('fare') || lower.includes('driver') || lower.includes('telemetry') || lower.includes('receipt') || lower.includes('invoice') || lower.includes('auto') || lower.includes('bike') || lower.includes('moto') || lower.includes('rickshaw') || lower.includes('scooter') || lower.includes('taxi')) {
-    const isComplete = lower.includes('complete') || lower.includes('finish') || lower.includes('end ride') || lower.includes('receipt') || lower.includes('invoice') || lower.includes('arrived');
-    const isCancel = lower.includes('cancel') || lower.includes('puncture') || lower.includes('fallback');
-    const isTelemetry = lower.includes('telemetry') || lower.includes('track') || lower.includes('status') || lower.includes('where') || lower.includes('accept');
-
-    // 1. Dynamic Tier & Vehicle Configuration (Auto, Bike/Moto, Premier, XL, Go)
     let detectedTier = 'Uber Go';
-    let baseFare = 50;
-    let perKm = 15.5;
+    let explicitlySpecifiedTier: string | null = null;
 
     if (lower.includes('bike') || lower.includes('moto') || lower.includes('motorcycle') || lower.includes('scooter') || lower.includes('two wheeler')) {
       detectedTier = 'Uber Moto';
-      baseFare = 25;
-      perKm = 8.0;
+      explicitlySpecifiedTier = 'Uber Moto';
     } else if (lower.includes('auto') || lower.includes('rickshaw') || lower.includes('tuk tuk') || lower.includes('three wheeler')) {
       detectedTier = 'Uber Auto';
-      baseFare = 35;
-      perKm = 11.5;
+      explicitlySpecifiedTier = 'Uber Auto';
     } else if (lower.includes('premier') || lower.includes('comfort') || lower.includes('sedan') || lower.includes('luxury')) {
       detectedTier = 'Uber Premier';
-      baseFare = 80;
-      perKm = 21.0;
+      explicitlySpecifiedTier = 'Uber Premier';
     } else if (lower.includes('xl') || lower.includes('suv') || lower.includes('innova') || lower.includes('ertiga') || lower.includes('6 seater')) {
       detectedTier = 'Uber XL';
-      baseFare = 100;
-      perKm = 25.0;
+      explicitlySpecifiedTier = 'Uber XL';
     }
 
-    // 2. Dynamic Route Extraction from natural language
-    let pickup = '';
-    let destination = '';
-
-    const cleanLocation = (loc: string): string => {
-      return loc
-        .replace(/(?:in an auto|by bike|by auto|in uber|by uber|in cab|by cab|please|now|fast|urgently)$/i, '')
-        .replace(/[,\.\?!]+$/, '')
-        .trim();
-    };
+    let pickupRaw = '';
+    let destinationRaw = '';
 
     const fromToMatch = userMessage.match(/(?:from|pickup(?:\s*at)?)\s+([^,\.\n\?]+?)\s+(?:to|heading to|drop(?:\s*off)?(?:\s*at)?)\s+([^,\.\n\?]+)/i);
     const toFromMatch = userMessage.match(/(?:to|heading to|drop(?:\s*off)?(?:\s*at)?)\s+([^,\.\n\?]+?)\s+(?:from|pickup(?:\s*at)?)\s+([^,\.\n\?]+)/i);
 
     if (fromToMatch) {
-      pickup = cleanLocation(fromToMatch[1]);
-      destination = cleanLocation(fromToMatch[2]);
+      pickupRaw = fromToMatch[1];
+      destinationRaw = fromToMatch[2];
     } else if (toFromMatch) {
-      destination = cleanLocation(toFromMatch[1]);
-      pickup = cleanLocation(toFromMatch[2]);
+      destinationRaw = toFromMatch[1];
+      pickupRaw = toFromMatch[2];
     } else {
       const toMatch = userMessage.match(/(?:to|heading to|drop(?:\s*off)?(?:\s*at)?)\s+([^,\.\n\?]+)/i);
       const fromMatch = userMessage.match(/(?:from|pickup(?:\s*at)?)\s+([^,\.\n\?]+)/i);
-      if (toMatch) destination = cleanLocation(toMatch[1]);
-      if (fromMatch) pickup = cleanLocation(fromMatch[1]);
+      if (toMatch) destinationRaw = toMatch[1];
+      if (fromMatch) pickupRaw = fromMatch[1];
     }
 
-    // Check conversation history if pickup or destination was omitted in follow-up turn
-    if (!pickup || !destination) {
+    if (!pickupRaw || !destinationRaw) {
       for (let i = historyMessages.length - 1; i >= 0; i--) {
         const histContent = historyMessages[i]?.content || '';
-        if (!pickup) {
+        if (!pickupRaw) {
           const histFrom = histContent.match(/(?:from|pickup(?:\s*at)?)\s+([^,\.\n]+)/i);
-          if (histFrom) pickup = cleanLocation(histFrom[1]);
+          if (histFrom) pickupRaw = histFrom[1];
         }
-        if (!destination) {
+        if (!destinationRaw) {
           const histTo = histContent.match(/(?:to|drop(?:\s*off)?(?:\s*at)?)\s+([^,\.\n]+)/i);
-          if (histTo) destination = cleanLocation(histTo[1]);
+          if (histTo) destinationRaw = histTo[1];
         }
-        if (pickup && destination) break;
+        if (pickupRaw && destinationRaw) break;
       }
     }
+
+    const { location: pickup, scheduledTime: pTime } = extractCleanLocationAndSchedule(pickupRaw);
+    const { location: destination, scheduledTime: dTime } = extractCleanLocationAndSchedule(destinationRaw);
 
     const hasVagueEndpoints = !pickup || !destination || isVagueLocation(pickup) || isVagueLocation(destination);
 
@@ -2252,7 +2215,7 @@ Return ONLY valid JSON matching the schema.
           `1. **Specific Pickup:** Please provide your exact pickup landmark or address and city (e.g., *Campus Gate 1, Bangalore* or *SGU Main Gate, Kolhapur*).\n` +
           `2. **Specific Destination:** Please provide your exact destination or airport terminal with city (e.g., *Airport Terminal 1* or *City Railway Station*).\n` +
           `3. **Service Tier:** Fares vary by vehicle type:\n` +
-          `   • 🛺 **Uber Auto** — Budget 3-wheeler for quick city transit\n` +
+          `   • 🛺 **Uber Auto / Local Auto** — Budget 3-wheeler for quick city transit\n` +
           `   • 🚗 **Uber Go** — Affordable compact 4-seater with AC\n` +
           `   • 🚘 **Uber Premier** — Premium executive sedan\n` +
           `   • 🚐 **Uber XL** — 6-seater SUV for luggage or groups\n` +
@@ -2262,257 +2225,56 @@ Return ONLY valid JSON matching the schema.
       }, null, channelName);
     }
 
-    // 3. Dynamic Distance & Tariff Computation
-    const computeDist = (p: string, d: string): number => {
-      let hash = 0;
-      const key = `${p.toLowerCase()}->${d.toLowerCase()}`;
-      for (let i = 0; i < key.length; i++) {
-        hash = (hash << 5) - hash + key.charCodeAt(i);
-        hash |= 0;
-      }
-      const dist = 5.0 + Math.abs(hash % 20) + ((key.length % 5) * 1.2);
-      return parseFloat(dist.toFixed(1));
-    };
-
-    const distanceKm = computeDist(pickup, destination);
+    const route = calculateMobilityRoute(pickupRaw, destinationRaw);
     const isEstimateQuery = /\b(?:estimate|fare|tariff|cost|how\s+much|rates?|pricing)\b/i.test(lower);
 
     if (isEstimateQuery) {
-      const tiers = [
-        { name: 'Uber Auto', icon: '🛺', base: 35, perKm: 11.5, speed: 2.5, minKm: 0, maxKm: 25 },
-        { name: 'Uber Go', icon: '🚗', base: 50, perKm: 15.5, speed: 2.2, minKm: 0, maxKm: 100 },
-        { name: 'Uber Premier', icon: '🚘', base: 80, perKm: 21.0, speed: 2.1, minKm: 0, maxKm: 100 },
-        { name: 'Uber XL', icon: '🚐', base: 100, perKm: 25.0, speed: 2.3, minKm: 0, maxKm: 100 },
-        { name: 'Uber Moto', icon: '🏍️', base: 25, perKm: 8.0, speed: 1.6, minKm: 0, maxKm: 20 },
-      ];
-
-      const available = tiers.filter(t => distanceKm >= t.minKm && distanceKm <= t.maxKm);
-      const rows = available.map(t => {
-        const fare = Math.round(t.base + distanceKm * t.perKm);
-        const low = Math.round(fare * 0.95);
-        const high = Math.round(fare * 1.15);
-        const mins = Math.round(distanceKm * t.speed + 4);
-        return `| ${t.icon} **${t.name}** | ₹${low} – ₹${high} | ~${mins} mins |`;
-      }).join('\n');
-
+      const response = formatMobilityResponse(route, explicitlySpecifiedTier || undefined);
       return attachSafetyAndTraces({
         type: 'general',
         agent: 'UBER',
         action: 'estimate',
-        params: { pickup, destination, distanceKm },
-        response: `🚗 **Mobility Tariff Estimates**\n\n` +
-          `• **Route:** ${pickup} ➔ ${destination}\n` +
-          `• **Estimated Distance:** ${distanceKm} km\n\n` +
-          `| Service Tier | Estimated Tariff | Travel Time |\n` +
-          `| :--- | :--- | :--- |\n` +
-          rows +
-          `\n\n💡 *To book any option, simply reply with your preferred tier (e.g., **"Book Uber Go from ${pickup} to ${destination}"**).*`,
-        explanation: `Calculated multi-tier mobility tariffs for ${pickup} to ${destination} (${distanceKm} km).`,
-      }, null, channelName);
-    }
-
-    const durationMins = detectedTier === 'Uber Moto' ? Math.round(distanceKm * 1.6 + 3) : Math.round(distanceKm * 2.2 + 4);
-    const calculatedFare = Math.round(baseFare + distanceKm * perKm);
-    const lockedFare = `₹${Math.round(calculatedFare * 0.95)} - ₹${Math.round(calculatedFare * 1.15)}`;
-
-    // 4. Dynamic Booking ID (reused from history if session is active)
-    let activeBookingId = '';
-    for (let i = historyMessages.length - 1; i >= 0; i--) {
-      const match = (historyMessages[i]?.content || '').match(/UBER-[A-Z0-9-]+/i);
-      if (match) {
-        activeBookingId = match[0];
-        break;
-      }
-    }
-    if (!activeBookingId) {
-      const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-      let suffix = '';
-      for (let i = 0; i < 6; i++) suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-      activeBookingId = `UBER-IND-${suffix}`;
-    }
-
-    // Dynamic Pan-India License Plate & Fleet Generator
-    const getPanIndiaPlate = (p: string, d: string): string => {
-      const combined = `${p.toLowerCase()} ${d.toLowerCase()}`;
-      const rLetters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-      const letters = rLetters.charAt(Math.floor(Math.random() * rLetters.length)) + rLetters.charAt(Math.floor(Math.random() * rLetters.length));
-      const digits = Math.floor(1000 + Math.random() * 9000);
-
-      if (combined.includes('delhi') || combined.includes('connaught') || combined.includes('dwarka') || combined.includes('saket') || combined.includes('noida') || combined.includes('gurgaon') || combined.includes('gurugram')) {
-        if (combined.includes('gurgaon') || combined.includes('gurugram')) return `HR 26 ${letters} ${digits}`;
-        if (combined.includes('noida')) return `UP 16 ${letters} ${digits}`;
-        return `DL 01 ${letters} ${digits}`;
-      }
-      if (combined.includes('mumbai') || combined.includes('bandra') || combined.includes('andheri') || combined.includes('colaba') || combined.includes('thane') || combined.includes('navi mumbai')) {
-        return `MH 02 ${letters} ${digits}`;
-      }
-      if (combined.includes('pune') || combined.includes('hinjewadi') || combined.includes('kothrud')) {
-        return `MH 12 ${letters} ${digits}`;
-      }
-      if (combined.includes('bengaluru') || combined.includes('bangalore') || combined.includes('indiranagar') || combined.includes('koramangala') || combined.includes('whitefield') || combined.includes('electronic city')) {
-        return `KA 05 ${letters} ${digits}`;
-      }
-      if (combined.includes('chennai') || combined.includes('t nagar') || combined.includes('velachery') || combined.includes('adyar')) {
-        return `TN 07 ${letters} ${digits}`;
-      }
-      if (combined.includes('kolkata') || combined.includes('howrah') || combined.includes('salt lake')) {
-        return `WB 02 ${letters} ${digits}`;
-      }
-      if (combined.includes('ahmedabad') || combined.includes('gandhinagar')) {
-        return `GJ 01 ${letters} ${digits}`;
-      }
-      if (combined.includes('jaipur')) {
-        return `RJ 14 ${letters} ${digits}`;
-      }
-      if (combined.includes('chandigarh') || combined.includes('mohali')) {
-        return `CH 01 ${letters} ${digits}`;
-      }
-      if (combined.includes('kochi') || combined.includes('ernakulam')) {
-        return `KL 07 ${letters} ${digits}`;
-      }
-      if (combined.includes('hyderabad') || combined.includes('gachibowli') || combined.includes('hitec') || combined.includes('jubilee') || combined.includes('secunderabad')) {
-        return `TS 09 ${letters} ${digits}`;
-      }
-
-      const RTO_LIST = ['DL 01', 'MH 02', 'KA 03', 'TS 09', 'TN 07', 'HR 26', 'UP 16', 'GJ 01', 'WB 02', 'RJ 14', 'KL 07'];
-      const pfx = RTO_LIST[Math.abs(combined.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)) % RTO_LIST.length];
-      return `${pfx} ${letters} ${digits}`;
-    };
-
-    // Fleet configuration per tier
-    const AUTO_DRIVERS = [
-      { name: 'Raju Goud', rating: '4.89', vehicle: 'Bajaj RE Compact Auto' },
-      { name: 'Mohan Kumar', rating: '4.91', vehicle: 'Piaggio Ape City Auto' },
-      { name: 'Santosh Yadav', rating: '4.86', vehicle: 'TVS King Deluxe Auto' },
-      { name: 'Shankar Rao', rating: '4.93', vehicle: 'Bajaj Maxima Auto' },
-    ];
-
-    const BIKE_DRIVERS = [
-      { name: 'Vikas Sharma', rating: '4.94', vehicle: 'Honda Activa 6G' },
-      { name: 'Arun Reddy', rating: '4.88', vehicle: 'Hero Splendor Plus' },
-      { name: 'Siddharth Rao', rating: '4.92', vehicle: 'TVS Jupiter 125' },
-      { name: 'Deepankar Sen', rating: '4.90', vehicle: 'Bajaj Pulsar 150' },
-    ];
-
-    const PREMIER_DRIVERS = [
-      { name: 'Vikramaditya Roy', rating: '4.97', vehicle: 'Honda City V' },
-      { name: 'Karthik Raman', rating: '4.95', vehicle: 'Hyundai Verna SX' },
-      { name: 'Gurpreet Singh', rating: '4.96', vehicle: 'Skoda Slavia Style' },
-    ];
-
-    const XL_DRIVERS = [
-      { name: 'Praveen Kumar', rating: '4.91', vehicle: 'Toyota Innova Crysta' },
-      { name: 'Sachin Patil', rating: '4.89', vehicle: 'Maruti Suzuki Ertiga ZXi' },
-      { name: 'Mohammed Farooq', rating: '4.92', vehicle: 'Kia Carens Prestige' },
-    ];
-
-    const GO_DRIVERS = [
-      { name: 'Amit Singh', rating: '4.91', vehicle: 'Maruti Suzuki Dzire' },
-      { name: 'Subhash Bose', rating: '4.93', vehicle: 'Maruti WagonR VXi' },
-      { name: 'Ravi Teja', rating: '4.89', vehicle: 'Hyundai Grand i10 Nios' },
-      { name: 'Mukesh Choudhary', rating: '4.90', vehicle: 'Tata Tigor EV' },
-    ];
-
-    const driverPool = detectedTier === 'Uber Auto' ? AUTO_DRIVERS
-      : detectedTier === 'Uber Moto' ? BIKE_DRIVERS
-      : detectedTier === 'Uber Premier' ? PREMIER_DRIVERS
-      : detectedTier === 'Uber XL' ? XL_DRIVERS
-      : GO_DRIVERS;
-
-    const driverIdx = Math.abs(activeBookingId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)) % driverPool.length;
-    const assignedDriver = driverPool[driverIdx];
-    const regionalPlate = getPanIndiaPlate(pickup, destination);
-
-    if (isComplete) {
-      return attachSafetyAndTraces({
-        type: 'action_stage',
-        agent: 'UBER',
-        action: 'complete',
         params: {
-          booking_id: activeBookingId,
-          status: 'completed',
-          pickup,
-          destination,
-          fare: `₹${calculatedFare}`,
-          driver: {
-            name: assignedDriver.name,
-            rating: assignedDriver.rating,
-          },
-          vehicle: {
-            make_model: assignedDriver.vehicle,
-            license_plate: regionalPlate,
-          },
-          distance_km: distanceKm,
-          duration_mins: durationMins,
-          payment_method: 'Uber AutoPay / UPI',
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
+          scheduledTime: route.scheduledTime,
+          distanceKm: route.distanceKm,
+          durationMins: route.durationMins,
+          routeVia: route.routeVia,
+          bookingUrl: route.bookingUrl,
+          isRegionalTier2: route.isRegionalTier2,
+          regionName: route.regionName,
+          tiers: route.tiers,
         },
-        explanation: `Finalizing trip from ${pickup} to ${destination} (${distanceKm} km), computing itemized taxes & dispatching receipt...`,
+        response,
+        explanation: `Calculated verified route distance and realistic tariffs for ${route.cleanPickup} to ${route.cleanDestination} (${route.distanceKm} km via ${route.routeVia}).`,
       }, null, channelName);
     }
 
-    if (isCancel) {
-      return attachSafetyAndTraces({
-        type: 'action_stage',
-        agent: 'UBER',
-        action: 'cancel',
-        params: {
-          booking_id: activeBookingId,
-          status: 'driver_canceled',
-          cancellation_reason: 'Driver vehicle issue',
-          pickup,
-          destination,
-          selected_tier: detectedTier,
-          locked_fare: lockedFare,
-        },
-        explanation: "Re-assigning nearest available vehicle for your ride...",
-      }, null, channelName);
-    }
-
-    if (isTelemetry) {
-      return attachSafetyAndTraces({
-        type: 'action_stage',
-        agent: 'UBER',
-        action: 'telemetry',
-        params: {
-          booking_id: activeBookingId,
-          status: 'accepted',
-          driver: {
-            name: assignedDriver.name,
-            phone_number: '+91 98765 43210',
-            rating: assignedDriver.rating,
-          },
-          vehicle: {
-            make_model: assignedDriver.vehicle,
-            license_plate: regionalPlate,
-            color: 'Silver',
-          },
-          eta: Math.max(2, Math.round(distanceKm * 0.15)),
-          pickup,
-          destination,
-          locked_fare: lockedFare,
-        },
-        explanation: `Updating live ride telemetry for ${pickup} to ${destination} (Driver: ${assignedDriver.name})...`,
-      }, null, channelName);
-    }
+    const tierObj = route.tiers.find(t => t.name.toLowerCase().includes(detectedTier.toLowerCase())) || route.tiers[1];
+    const lockedFare = `₹${tierObj.minFare} – ₹${tierObj.maxFare}`;
 
     return attachSafetyAndTraces({
       type: 'action_stage',
       agent: 'UBER',
       action: 'book',
       params: {
-        pickup,
-        destination,
-        selected_tier: detectedTier,
-        tier: detectedTier,
+        pickup: route.cleanPickup,
+        destination: route.cleanDestination,
+        scheduledTime: route.scheduledTime,
+        selected_tier: tierObj.name,
+        tier: tierObj.name,
         locked_fare: lockedFare,
-        fare: calculatedFare,
-        distance: `${distanceKm} km`,
-        duration: `${durationMins} mins`,
-        booking_id: activeBookingId,
-        ride_pin: String(Math.floor(1000 + Math.random() * 9000)),
+        fare: Math.round((tierObj.minFare + tierObj.maxFare) / 2),
+        distance: `${route.distanceKm} km`,
+        duration: `${route.durationMins} mins`,
+        routeVia: route.routeVia,
+        bookingUrl: route.bookingUrl,
+        isRegionalTier2: route.isRegionalTier2,
+        regionName: route.regionName,
         liveMode: true,
       },
-      explanation: `Prepared ${detectedTier} booking from ${pickup} to ${destination} (${distanceKm} km, ~${durationMins} mins) for your approval.`,
+      explanation: `Prepared ${tierObj.name} booking from ${route.cleanPickup} to ${route.cleanDestination} (${route.distanceKm} km, ~${route.durationMins} mins via ${route.routeVia}) for your approval.`,
     }, null, channelName);
   }
 
