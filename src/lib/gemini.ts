@@ -1135,6 +1135,7 @@ export function preRouteDeterministicIntent(
     }
 
     if (!route.uberServiceAvailable) {
+      const response = formatMobilityResponse(route, explicitlySpecifiedTier || undefined);
       return attachSafetyAndTraces({
         type: 'general',
         agent: 'UBER',
@@ -1143,17 +1144,13 @@ export function preRouteDeterministicIntent(
           pickup: route.cleanPickup,
           destination: route.cleanDestination,
           distanceKm: route.distanceKm,
+          durationMins: route.durationMins,
           googleMapsUrl: route.googleMapsUrl,
+          routeVia: route.routeVia,
+          tiers: route.tiers,
         },
-        response: `⚠️ **Uber Cab Dispatch is Unavailable in Kolhapur / Atigre**\n\n` +
-          `Uber does not operate local intra-city taxi services in the Kolhapur district.\n\n` +
-          `**Verified Real-World Alternatives for ${route.cleanPickup} ➔ ${route.cleanDestination} (${route.distanceKm} km via NH 166):**\n\n` +
-          `1. 🛺 **Special Auto from SGU Gate:** Walk to the auto stand stationed outside SGU Main Gate (Fare: ~₹250 – ₹300, ~40 mins direct drop).\n` +
-          `2. 🛺 **Shared 6-Seater / Vadap Auto:** Regular pickups on NH 166 heading to CBS / Station (Fare: ₹35 – ₹50 / seat).\n` +
-          `3. 🚌 **MSRTC ST Bus from Atigre Phata:** Buses depart every 10–15 mins to Kolhapur CBS (Fare: ₹25 – ₹35, ~38 mins).\n` +
-          `4. 🚕 **Local Private Taxi:** Available via city taxi operators (Fare: ~₹550 – ₹700).\n\n` +
-          `📍 **[Open Driving Route & Transit Navigation on Google Maps](${route.googleMapsUrl})**`,
-        explanation: `Informed user that Uber is not operational in ${route.regionName} and provided verified local transit alternatives.`,
+        response,
+        explanation: `Informed user that Uber is not operational in ${route.regionName} and provided authentic local transit alternatives for ${route.distanceKm} km route to ${route.cleanDestination}.`,
       }, pendingAction, channelName);
     }
 
