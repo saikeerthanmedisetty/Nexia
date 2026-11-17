@@ -1,7 +1,8 @@
 /**
- * Autonomous Executive Mobility & Transit Routing Engine
- * Provides accurate geocoding, realistic tariff calculation, regional availability intelligence,
- * and verified Universal Uber Deeplinks for seamless real-world transit.
+ * Autonomous Executive Mobility & Regional Transit Intelligence Engine
+ * Provides accurate geocoding, authentic transit availability intelligence,
+ * truthful regional alternatives for non-Uber zones (e.g. Kolhapur/Atigre),
+ * and verified Universal Uber Deeplinks for operational metro corridors.
  */
 
 export interface MobilityRouteInfo {
@@ -15,9 +16,11 @@ export interface MobilityRouteInfo {
   routeVia: string;
   isRegionalTier2: boolean;
   regionName: string;
+  uberServiceAvailable: boolean;
   tiers: MobilityTierOption[];
   bookingUrl: string;
-  availabilityNotice?: string;
+  googleMapsUrl: string;
+  availabilityNotice: string;
 }
 
 export interface MobilityTierOption {
@@ -25,16 +28,15 @@ export interface MobilityTierOption {
   name: string;
   icon: string;
   capacity: string;
-  baseFare: number;
-  perKm: number;
-  minFare: number;
-  maxFare: number;
+  fareRange: string;
+  minFare?: number;
+  maxFare?: number;
   durationMins: number;
   availableLocally: boolean;
-  notes?: string;
+  transitType: 'auto' | 'bus' | 'taxi' | 'uber_app' | 'shared';
+  notes: string;
 }
 
-// Known landmark database with real road network distances & regional transit profiles
 interface KnownLocation {
   name: string;
   aliases: string[];
@@ -42,19 +44,19 @@ interface KnownLocation {
   lng: number;
   city: string;
   state: string;
-  isSuburbanOrTier2: boolean;
+  uberOperational: boolean;
 }
 
 const KNOWN_LOCATIONS: KnownLocation[] = [
-  // Kolhapur & SGU Hub
+  // Kolhapur & SGU Hub (Uber does NOT operate local intra-city fleet here)
   {
-    name: "Sanjay Ghodawat University Main Gate",
+    name: "Sanjay Ghodawat University Main Gate (Atigre)",
     aliases: ["sanjay ghodawat university", "sgu", "sgu main gate", "ghodawat university", "atigre", "atigre campus", "sgu campus", "ghodawat"],
     lat: 16.7441,
     lng: 74.3721,
     city: "Kolhapur",
     state: "Maharashtra",
-    isSuburbanOrTier2: true,
+    uberOperational: false,
   },
   {
     name: "Chhatrapati Shahu Maharaj Terminus (Kolhapur Railway Station)",
@@ -63,7 +65,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 74.2403,
     city: "Kolhapur",
     state: "Maharashtra",
-    isSuburbanOrTier2: true,
+    uberOperational: false,
   },
   {
     name: "Central Bus Stand (CBS Kolhapur)",
@@ -72,7 +74,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 74.2435,
     city: "Kolhapur",
     state: "Maharashtra",
-    isSuburbanOrTier2: true,
+    uberOperational: false,
   },
   {
     name: "Kolhapur Airport (KLH / Ujalaiwadi)",
@@ -81,7 +83,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 74.2819,
     city: "Kolhapur",
     state: "Maharashtra",
-    isSuburbanOrTier2: true,
+    uberOperational: false,
   },
   {
     name: "Mahalaxmi Temple (Ambabai Mandir)",
@@ -90,7 +92,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 74.2232,
     city: "Kolhapur",
     state: "Maharashtra",
-    isSuburbanOrTier2: true,
+    uberOperational: false,
   },
   {
     name: "Hatkanangale Railway Station",
@@ -99,7 +101,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 74.4447,
     city: "Kolhapur",
     state: "Maharashtra",
-    isSuburbanOrTier2: true,
+    uberOperational: false,
   },
   {
     name: "Ichalkaranji Textile City Center",
@@ -108,7 +110,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 74.4637,
     city: "Kolhapur",
     state: "Maharashtra",
-    isSuburbanOrTier2: true,
+    uberOperational: false,
   },
   {
     name: "Jaysingpur Town Center",
@@ -117,7 +119,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 74.5578,
     city: "Kolhapur",
     state: "Maharashtra",
-    isSuburbanOrTier2: true,
+    uberOperational: false,
   },
   {
     name: "Sangli Railway Station / Central Bus Stand",
@@ -126,9 +128,9 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 74.5815,
     city: "Sangli",
     state: "Maharashtra",
-    isSuburbanOrTier2: true,
+    uberOperational: false,
   },
-  // Major Metros (Full On-Demand Availability)
+  // Major Metros (Full On-Demand Uber Availability)
   {
     name: "Pune Railway Station",
     aliases: ["pune station", "pune railway station", "pune junction"],
@@ -136,7 +138,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 73.8744,
     city: "Pune",
     state: "Maharashtra",
-    isSuburbanOrTier2: false,
+    uberOperational: true,
   },
   {
     name: "Pune International Airport (PNQ)",
@@ -145,7 +147,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 73.9197,
     city: "Pune",
     state: "Maharashtra",
-    isSuburbanOrTier2: false,
+    uberOperational: true,
   },
   {
     name: "Chhatrapati Shivaji Maharaj Terminus (Mumbai CSMT)",
@@ -154,7 +156,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 72.8356,
     city: "Mumbai",
     state: "Maharashtra",
-    isSuburbanOrTier2: false,
+    uberOperational: true,
   },
   {
     name: "Chhatrapati Shivaji Maharaj International Airport (BOM / Mumbai)",
@@ -163,7 +165,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 72.8656,
     city: "Mumbai",
     state: "Maharashtra",
-    isSuburbanOrTier2: false,
+    uberOperational: true,
   },
   {
     name: "Kempegowda International Airport (BLR / Bangalore)",
@@ -172,7 +174,7 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     lng: 77.7066,
     city: "Bangalore",
     state: "Karnataka",
-    isSuburbanOrTier2: false,
+    uberOperational: true,
   },
 ];
 
@@ -180,24 +182,18 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
  * Clean location strings by removing dates, times, and filler conversational tokens
  */
 export function extractCleanLocationAndSchedule(raw: string): { location: string; scheduledTime?: string } {
-  let text = raw.trim();
+  let text = (raw || '').trim();
 
-  // Extract scheduled time expressions (e.g., "for tomorrow 9 AM", "tomorrow at 3 PM", "at 5:30 pm")
   let scheduledTime: string | undefined;
-  const timeRegex = /\b(?:for|at|on)?\s*(tomorrow|today|tonight|day after tomorrow)?\s*(?:at\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)|morning|evening|noon|afternoon)?\b/i;
-  
   const scheduleMatch = text.match(/(?:for|at|on)\s+(tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)))?/i)
     || text.match(/(?:for|at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i);
 
   if (scheduleMatch) {
     scheduledTime = scheduleMatch[0].replace(/^(?:for|at|on)\s+/i, '').trim();
-    // Capitalize nicely
     scheduledTime = scheduledTime.charAt(0).toUpperCase() + scheduledTime.slice(1);
-    // Strip schedule from location string
     text = text.replace(scheduleMatch[0], ' ');
   }
 
-  // Strip common conversational artifacts
   text = text
     .replace(/\b(in an auto|by bike|by auto|in uber|by uber|in cab|by cab|please|now|fast|urgently|asap)\b/gi, '')
     .replace(/\s+/g, ' ')
@@ -246,145 +242,206 @@ export function calculateMobilityRoute(pickupRaw: string, destinationRaw: string
   const locA = findMatchingLocation(cleanPickup);
   const locB = findMatchingLocation(cleanDestination);
 
+  const combined = `${cleanPickup} ${cleanDestination}`.toLowerCase();
+  const isKolhapurZone = 
+    locA?.city === 'Kolhapur' || 
+    locB?.city === 'Kolhapur' || 
+    locA?.city === 'Sangli' || 
+    locB?.city === 'Sangli' ||
+    combined.includes('kolhapur') || 
+    combined.includes('sgu') || 
+    combined.includes('ghodawat') || 
+    combined.includes('atigre') || 
+    combined.includes('sangli') || 
+    combined.includes('hatkanangale') ||
+    combined.includes('ichalkaranji');
+
+  // Uber does NOT operate local intra-city cabs in Kolhapur district
+  const uberServiceAvailable = !isKolhapurZone && (locA ? locA.uberOperational : true) && (locB ? locB.uberOperational : true);
+
   let distanceKm = 15.0;
-  let durationMins = 30;
+  let durationMins = 35;
   let routeVia = "NH 166 Arterial Highway";
-  let isRegionalTier2 = false;
-  let regionName = "India";
+  let isRegionalTier2 = isKolhapurZone;
+  let regionName = isKolhapurZone ? "Kolhapur (Maharashtra)" : (locA?.city || locB?.city || "Metro Transit Corridor");
 
-  // Case 1: Exact SGU <-> Kolhapur Station corridor
-  const isSguA = locA?.aliases.includes("sgu");
-  const isSguB = locB?.aliases.includes("sgu");
-  const isKolhapurStationA = locA?.aliases.includes("kolhapur railway station");
-  const isKolhapurStationB = locB?.aliases.includes("kolhapur railway station");
-  const isCbsA = locA?.aliases.includes("central bus stand");
-  const isCbsB = locB?.aliases.includes("central bus stand");
-  const isAirportA = locA?.aliases.includes("kolhapur airport");
-  const isAirportB = locB?.aliases.includes("kolhapur airport");
+  const isSguA = locA?.aliases.includes("sgu") || combined.includes("sgu") || combined.includes("ghodawat");
+  const isStationB = locB?.aliases.includes("kolhapur railway station") || combined.includes("railway station") || combined.includes("station");
+  const isCbsB = locB?.aliases.includes("central bus stand") || combined.includes("cbs") || combined.includes("bus stand");
+  const isAirportB = locB?.aliases.includes("kolhapur airport") || combined.includes("airport");
 
-  if ((isSguA && isKolhapurStationB) || (isKolhapurStationA && isSguB)) {
-    // Verified real highway route: SGU Atigre to Kolhapur Railway Station
+  if (isSguA && isStationB) {
     distanceKm = 19.5;
     durationMins = 38;
     routeVia = "Kolhapur-Sangli Hwy / NH 166 via Shiroli & Tarabai Park";
-    isRegionalTier2 = true;
-    regionName = "Kolhapur (Maharashtra)";
-  } else if ((isSguA && isCbsB) || (isCbsA && isSguB)) {
+  } else if (isSguA && isCbsB) {
     distanceKm = 18.5;
     durationMins = 35;
-    routeVia = "Kolhapur-Sangli Hwy / NH 166 to Central Bus Stand";
-    isRegionalTier2 = true;
-    regionName = "Kolhapur (Maharashtra)";
-  } else if ((isSguA && isAirportB) || (isAirportA && isSguB)) {
+    routeVia = "Kolhapur-Sangli Hwy / NH 166 directly to Central Bus Stand";
+  } else if (isSguA && isAirportB) {
     distanceKm = 22.0;
     durationMins = 42;
     routeVia = "NH 166 & Ujalaiwadi Airport Link Road";
-    isRegionalTier2 = true;
-    regionName = "Kolhapur (Maharashtra)";
   } else if (locA && locB) {
     const directKm = calculateHaversineDistance(locA.lat, locA.lng, locB.lat, locB.lng);
-    // Road curvature factor for Indian highways / arterial streets is ~1.32x
     distanceKm = parseFloat((directKm * 1.32).toFixed(1));
-    durationMins = Math.max(12, Math.round(distanceKm * 2.1 + 4));
-    routeVia = `Direct Arterial Corridor connecting ${locA.city}`;
-    isRegionalTier2 = locA.isSuburbanOrTier2 || locB.isSuburbanOrTier2;
-    regionName = locA.city || locB.city;
-  } else {
-    // Heuristic estimation based on typical intra-city trip
-    const combined = `${cleanPickup} ${cleanDestination}`.toLowerCase();
-    if (combined.includes('kolhapur') || combined.includes('sgu') || combined.includes('ghodawat') || combined.includes('sangli')) {
-      distanceKm = 19.5;
-      durationMins = 38;
-      routeVia = "Kolhapur-Sangli Hwy / NH 166";
-      isRegionalTier2 = true;
-      regionName = "Kolhapur (Maharashtra)";
-    } else {
-      distanceKm = 14.5;
-      durationMins = 32;
-      routeVia = "Urban Arterial Corridor";
-      isRegionalTier2 = false;
-      regionName = "Metro Transit Zone";
-    }
+    durationMins = Math.max(15, Math.round(distanceKm * 2.1 + 4));
+    routeVia = `Arterial Corridor connecting ${locA.city}`;
   }
 
-  // Calculate realistic tariffs based on Maharashtra RTO & Indian Mobility Benchmarks
-  const tiers: MobilityTierOption[] = [
-    {
-      id: "uber_auto",
-      name: "Uber Auto / Local Auto",
-      icon: "🛺",
-      capacity: "3 passengers",
-      baseFare: 30,
-      perKm: 13.0,
-      minFare: Math.round(30 + distanceKm * 12.0),
-      maxFare: Math.round(30 + distanceKm * 14.5),
-      durationMins: Math.round(durationMins * 1.1),
-      availableLocally: true,
-      notes: isRegionalTier2 ? "Readily available at SGU Main Gate & Kolhapur city stands" : "Available on-demand",
-    },
-    {
-      id: "uber_go",
-      name: "Uber Go (AC Compact)",
-      icon: "🚗",
-      capacity: "4 passengers",
-      baseFare: 60,
-      perKm: 18.0,
-      minFare: Math.round(60 + distanceKm * 17.0),
-      maxFare: Math.round(60 + distanceKm * 20.0),
-      durationMins: durationMins,
-      availableLocally: !isRegionalTier2,
-      notes: isRegionalTier2 ? "Subject to live driver availability in Atigre corridor" : "Available on-demand",
-    },
-    {
-      id: "uber_premier",
-      name: "Uber Premier (Sedan)",
-      icon: "🚘",
-      capacity: "4 passengers",
-      baseFare: 90,
-      perKm: 23.5,
-      minFare: Math.round(90 + distanceKm * 22.0),
-      maxFare: Math.round(90 + distanceKm * 25.5),
-      durationMins: Math.max(15, durationMins - 2),
-      availableLocally: !isRegionalTier2,
-      notes: isRegionalTier2 ? "Advance / Intercity booking recommended" : "Available on-demand",
-    },
-    {
-      id: "uber_xl",
-      name: "Uber XL (SUV / Innova)",
-      icon: "🚐",
-      capacity: "6 passengers + luggage",
-      baseFare: 120,
-      perKm: 28.0,
-      minFare: Math.round(120 + distanceKm * 26.0),
-      maxFare: Math.round(120 + distanceKm * 31.0),
-      durationMins: durationMins,
-      availableLocally: !isRegionalTier2,
-      notes: isRegionalTier2 ? "Available via Rental / Intercity" : "Available on-demand",
-    },
-    {
-      id: "uber_moto",
-      name: "Uber Moto / Bike Taxi",
-      icon: "🏍️",
-      capacity: "1 passenger",
-      baseFare: 25,
-      perKm: 8.5,
-      minFare: Math.round(25 + distanceKm * 7.5),
-      maxFare: Math.round(25 + distanceKm * 9.5),
-      durationMins: Math.round(durationMins * 0.75),
-      availableLocally: distanceKm <= 25,
-      notes: "Solo express transit with helmet provided",
-    },
-  ];
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(cleanPickup)}&destination=${encodeURIComponent(cleanDestination)}&travelmode=driving`;
+  const bookingUrl = uberServiceAvailable
+    ? `https://m.uber.com/ul/?action=setPickup&pickup[formatted_address]=${encodeURIComponent(cleanPickup)}&dropoff[formatted_address]=${encodeURIComponent(cleanDestination)}`
+    : googleMapsUrl;
 
-  // Official Universal Uber Deeplink with pre-filled coordinates & formatted addresses
-  const bookingUrl = `https://m.uber.com/ul/?action=setPickup&pickup[formatted_address]=${encodeURIComponent(cleanPickup)}&dropoff[formatted_address]=${encodeURIComponent(cleanDestination)}`;
+  let tiers: MobilityTierOption[] = [];
+  let availabilityNotice = '';
 
-  let availabilityNotice: string | undefined;
-  if (isRegionalTier2) {
-    availabilityNotice = `📍 **Kolhapur & SGU Regional Transit Note**:
-• In Kolhapur and suburban highway corridors (Atigre / Hatkanangale), on-demand Uber Go cabs operate with limited or intermittent driver availability.
-• **Local Auto-Rickshaws** (stationed outside SGU Main Gate) and private City Taxis operate 24/7 along the Kolhapur-Sangli Highway (NH 166).
-• Use the **Live Uber Deeplink** below to check immediate real-time driver availability for your exact coordinates in the Uber app.`;
+  if (!uberServiceAvailable) {
+    // Truthful, authentic regional transit options for Kolhapur / SGU
+    tiers = [
+      {
+        id: "local_special_auto",
+        name: "Special Auto (SGU Main Gate Stand)",
+        icon: "🛺",
+        capacity: "3 passengers",
+        fareRange: "₹250 – ₹300",
+        minFare: 250,
+        maxFare: 300,
+        durationMins: Math.round(durationMins * 1.1),
+        availableLocally: true,
+        transitType: "auto",
+        notes: "Stationed 24/7 outside SGU Main Gate; direct point-to-point drop to Station",
+      },
+      {
+        id: "shared_vadap_auto",
+        name: "Shared 6-Seater / Vadap Auto",
+        icon: "🛺",
+        capacity: "Per-seat passenger transit",
+        fareRange: "₹35 – ₹50 / seat",
+        minFare: 35,
+        maxFare: 50,
+        durationMins: Math.round(durationMins * 1.2),
+        availableLocally: true,
+        transitType: "shared",
+        notes: "Budget student transit; frequent departures along NH 166 directly to CBS / Station",
+      },
+      {
+        id: "msrtc_st_bus",
+        name: "MSRTC State Transport (ST) Bus",
+        icon: "🚌",
+        capacity: "Non-AC / Semi-Luxury ST Bus",
+        fareRange: "₹25 – ₹35 / seat",
+        minFare: 25,
+        maxFare: 35,
+        durationMins: durationMins,
+        availableLocally: true,
+        transitType: "bus",
+        notes: "Atigre Phata Stop (opposite SGU Gate); buses depart every 10–15 mins to Kolhapur CBS",
+      },
+      {
+        id: "private_city_taxi",
+        name: "Local Private City Taxi / Rental",
+        icon: "🚕",
+        capacity: "4 passengers (AC Sedan / Dzire)",
+        fareRange: "₹550 – ₹700",
+        minFare: 550,
+        maxFare: 700,
+        durationMins: Math.max(25, durationMins - 4),
+        availableLocally: true,
+        transitType: "taxi",
+        notes: "Advance booking via Kolhapur Cabs / 19Cabs / SGU Travel Desk",
+      },
+      {
+        id: "uber_app_status",
+        name: "Uber (Go / Premier / Auto)",
+        icon: "🚫",
+        capacity: "App-based cab aggregator",
+        fareRange: "Not Operational",
+        minFare: 0,
+        maxFare: 0,
+        durationMins: 0,
+        availableLocally: false,
+        transitType: "uber_app",
+        notes: "Uber DOES NOT operate local intra-city cabs in Kolhapur (Intercity drops only from Pune/Mumbai)",
+      },
+    ];
+
+    availabilityNotice = `⚠️ **Uber Local Service Status for Kolhapur / Atigre**:
+• **Uber does NOT operate local intra-city ride services in Kolhapur.** App-based cab aggregators (Uber & Ola) do not maintain active local driver fleets in this district.
+• Uber only operates for long-distance **Uber Intercity** trips arriving from major metros like Pune or Mumbai (e.g. Pune ➔ Kolhapur).
+• Real-world transit for students and staff relies on **Local Autos stationed at SGU Main Gate**, **MSRTC Buses from Atigre Phata**, or private city cabs.`;
+  } else {
+    // Standard metro rate card where Uber actually operates
+    tiers = [
+      {
+        id: "uber_auto",
+        name: "Uber Auto",
+        icon: "🛺",
+        capacity: "3 passengers",
+        fareRange: `₹${Math.round(30 + distanceKm * 12.0)} – ₹${Math.round(30 + distanceKm * 14.5)}`,
+        minFare: Math.round(30 + distanceKm * 12.0),
+        maxFare: Math.round(30 + distanceKm * 14.5),
+        durationMins: Math.round(durationMins * 1.1),
+        availableLocally: true,
+        transitType: "uber_app",
+        notes: "On-demand city auto",
+      },
+      {
+        id: "uber_go",
+        name: "Uber Go (AC Compact)",
+        icon: "🚗",
+        capacity: "4 passengers",
+        fareRange: `₹${Math.round(60 + distanceKm * 17.0)} – ₹${Math.round(60 + distanceKm * 20.0)}`,
+        minFare: Math.round(60 + distanceKm * 17.0),
+        maxFare: Math.round(60 + distanceKm * 20.0),
+        durationMins: durationMins,
+        availableLocally: true,
+        transitType: "uber_app",
+        notes: "Affordable compact AC cab",
+      },
+      {
+        id: "uber_premier",
+        name: "Uber Premier (Sedan)",
+        icon: "🚘",
+        capacity: "4 passengers",
+        fareRange: `₹${Math.round(90 + distanceKm * 22.0)} – ₹${Math.round(90 + distanceKm * 25.5)}`,
+        minFare: Math.round(90 + distanceKm * 22.0),
+        maxFare: Math.round(90 + distanceKm * 25.5),
+        durationMins: Math.max(15, durationMins - 2),
+        availableLocally: true,
+        transitType: "uber_app",
+        notes: "Executive sedan",
+      },
+      {
+        id: "uber_xl",
+        name: "Uber XL (SUV)",
+        icon: "🚐",
+        capacity: "6 passengers + luggage",
+        fareRange: `₹${Math.round(120 + distanceKm * 26.0)} – ₹${Math.round(120 + distanceKm * 31.0)}`,
+        minFare: Math.round(120 + distanceKm * 26.0),
+        maxFare: Math.round(120 + distanceKm * 31.0),
+        durationMins: durationMins,
+        availableLocally: true,
+        transitType: "uber_app",
+        notes: "6-seater SUV",
+      },
+      {
+        id: "uber_moto",
+        name: "Uber Moto / Bike Taxi",
+        icon: "🏍️",
+        capacity: "1 passenger",
+        fareRange: `₹${Math.round(25 + distanceKm * 7.5)} – ₹${Math.round(25 + distanceKm * 9.5)}`,
+        minFare: Math.round(25 + distanceKm * 7.5),
+        maxFare: Math.round(25 + distanceKm * 9.5),
+        durationMins: Math.round(durationMins * 0.75),
+        availableLocally: distanceKm <= 25,
+        transitType: "uber_app",
+        notes: "Solo express transit with helmet",
+      },
+    ];
+
+    availabilityNotice = `🟢 **On-Demand Mobility Active**: Live driver fleet available in this metro transit zone.`;
   }
 
   return {
@@ -398,8 +455,10 @@ export function calculateMobilityRoute(pickupRaw: string, destinationRaw: string
     routeVia,
     isRegionalTier2,
     regionName,
+    uberServiceAvailable,
     tiers,
     bookingUrl,
+    googleMapsUrl,
     availabilityNotice,
   };
 }
@@ -410,17 +469,47 @@ export function calculateMobilityRoute(pickupRaw: string, destinationRaw: string
 export function formatMobilityResponse(route: MobilityRouteInfo, selectedTier?: string): string {
   const timeBadge = route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : '';
 
+  if (!route.uberServiceAvailable) {
+    const tableHeader = `| Transit Option | Realistic Tariff | Travel Time | Local Availability |
+| :--- | :--- | :--- | :--- |`;
+
+    const tableRows = route.tiers.map(t => {
+      const availBadge = t.availableLocally
+        ? '🟢 Readily Available'
+        : '🔴 Not Operational';
+      return `| ${t.icon} **${t.name}** | ${t.fareRange} | ${t.durationMins ? `~${t.durationMins} mins` : '—'} | ${availBadge} |`;
+    }).join('\n');
+
+    return `🚗 **Executive Transit & Route Intelligence**
+
+• **Pickup:** ${route.cleanPickup}
+• **Destination:** ${route.cleanDestination}
+• **Road Corridor:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${timeBadge}
+
+⚠️ **Uber Service Notice for Kolhapur / Atigre:**
+**Uber does NOT operate local intra-city ride services in Kolhapur.** App-based cab aggregators have no active local fleets in this region (Uber only operates long-distance Intercity drop-offs arriving from major metros like Pune/Mumbai).
+
+### 🚦 Verified Real-World Transit Options for SGU Corridor:
+${tableHeader}
+${tableRows}
+
+📍 **Ground Reality Advice for SGU Students & Staff:**
+• **Fastest Direct Ride:** Take a **Special Auto** from the auto stand located directly at the SGU Main Gate (~₹250–₹300 point-to-point to Kolhapur Station).
+• **Most Economical:** Board an **MSRTC ST Bus** from Atigre Phata (buses every 10–15 mins heading to CBS for ₹25–₹35) or a shared Vadap auto (₹35–₹50).
+
+---
+### 🗺️ Live Navigation & Highway Route
+📍 **[Open Verified Route in Google Maps](${route.googleMapsUrl})**
+*(Live turn-by-turn traffic on NH 166, highway landmarks, and real-time transit bus stops)*`;
+  }
+
+  // Metro corridor with active Uber service
   const tableHeader = `| Service Tier | Estimated Tariff | Estimated Time | Availability |
 | :--- | :--- | :--- | :--- |`;
 
   const tableRows = route.tiers.map(t => {
-    const availBadge = t.availableLocally
-      ? '🟢 Readily Available'
-      : '🟡 Check Live App';
-    return `| ${t.icon} **${t.name}** | ₹${t.minFare} – ₹${t.maxFare} | ~${t.durationMins} mins | ${availBadge} |`;
+    return `| ${t.icon} **${t.name}** | ${t.fareRange} | ~${t.durationMins} mins | 🟢 Available On-Demand |`;
   }).join('\n');
-
-  const regionalNote = route.availabilityNotice ? `\n\n${route.availabilityNotice}` : '';
 
   return `🚗 **Executive Transit Route & Fare Estimates**
 
@@ -429,10 +518,10 @@ export function formatMobilityResponse(route: MobilityRouteInfo, selectedTier?: 
 • **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${timeBadge}
 
 ${tableHeader}
-${tableRows}${regionalNote}
+${tableRows}
 
 ---
 ### 📲 Live Dispatch & Booking
 🔗 **[Open Official Uber App to Verify & Dispatch Ride](${route.bookingUrl})**
-*(Clicking opens the official Uber app on Android/iOS or web with pickup & destination pre-filled for 1-click live driver matching)*`;
+*(Clicking opens the official Uber app with pickup & destination pre-filled for 1-click driver matching)*`;
 }

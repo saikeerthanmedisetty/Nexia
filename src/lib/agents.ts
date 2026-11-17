@@ -212,11 +212,28 @@ export async function executeAgent(
       };
     }
 
-    // Default: Dispatch / Booking confirmation
-    const regionalNotice = route.isRegionalTier2
-      ? `\n\n⚠️ **Kolhapur & SGU Regional Transit Intelligence:**\n• In Atigre / Kolhapur highway corridors, on-demand Uber Go cabs have limited availability.\n• Local Auto-Rickshaws (stationed at SGU Main Gate) and private City Taxis operate 24/7 along NH 166.\n• Click below to match live drivers currently active in your sector in the official Uber app.`
-      : '';
+    if (!route.uberServiceAvailable) {
+      return {
+        success: true,
+        data: {
+          status: 'unavailable_locally',
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
+          distance_km: route.distanceKm,
+          googleMapsUrl: route.googleMapsUrl,
+          message: `⚠️ **Uber Cab Dispatch is Unavailable in Kolhapur / Atigre**\n\n` +
+            `Uber does not operate local intra-city taxi services in the Kolhapur district.\n\n` +
+            `**Verified Real-World Alternatives for ${route.cleanPickup} ➔ ${route.cleanDestination} (${route.distanceKm} km via NH 166):**\n` +
+            `1. 🛺 **Special Auto from SGU Gate:** Walk to the auto stand stationed outside SGU Main Gate (Fare: ~₹250 – ₹300, ~40 mins direct drop).\n` +
+            `2. 🛺 **Shared 6-Seater / Vadap Auto:** Regular pickups on NH 166 heading to CBS / Station (Fare: ₹35 – ₹50 / seat).\n` +
+            `3. 🚌 **MSRTC ST Bus from Atigre Phata:** Buses depart every 10–15 mins to Kolhapur CBS (Fare: ₹25 – ₹35, ~38 mins).\n` +
+            `4. 🚕 **Local Private Taxi:** Available via city taxi operators (Fare: ~₹550 – ₹700).\n\n` +
+            `📍 **[Open Driving Route & Transit Navigation on Google Maps](${route.googleMapsUrl})**`,
+        },
+      };
+    }
 
+    // Default: Dispatch / Booking confirmation for metro zones where Uber operates
     return {
       success: true,
       data: {
@@ -225,11 +242,11 @@ export async function executeAgent(
         pickup: route.cleanPickup,
         destination: route.cleanDestination,
         tier: selectedTierObj.name,
-        fare: `₹${selectedTierObj.minFare} – ₹${selectedTierObj.maxFare}`,
+        fare: selectedTierObj.fareRange,
         distance: `${route.distanceKm} km`,
         duration: `${route.durationMins} mins`,
         bookingUrl: route.bookingUrl,
-        message: `🚗 **Mobility Dispatch Configured**\n\n• **Pickup:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Service Tier:** ${selectedTierObj.name}\n• **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Scheduled Departure:** ${route.scheduledTime}` : ''}\n• **Estimated Tariff:** ₹${selectedTierObj.minFare} – ₹${selectedTierObj.maxFare}\n\n📲 **[Launch Official Uber App to Finalize Driver Match](${route.bookingUrl})**${regionalNotice}`,
+        message: `🚗 **Mobility Dispatch Configured**\n\n• **Pickup:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Service Tier:** ${selectedTierObj.name}\n• **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Scheduled Departure:** ${route.scheduledTime}` : ''}\n• **Estimated Tariff:** ${selectedTierObj.fareRange}\n\n📲 **[Launch Official Uber App to Finalize Driver Match](${route.bookingUrl})**`,
       },
     };
   }

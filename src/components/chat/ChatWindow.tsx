@@ -70,9 +70,9 @@ const DEMO_SCENARIOS = [
   },
   {
     title: "Transit to Station",
-    tag: "Uber Dispatch",
+    tag: "Mobility Intelligence",
     icon: <Car size={13} />,
-    prompt: "Find Uber ride options and fare estimates from Sanjay Ghodawat University main gate to Kolhapur Railway Station for tomorrow 9 AM",
+    prompt: "Check transit options and road distance from Sanjay Ghodawat University main gate to Kolhapur Railway Station for tomorrow 9 AM",
   },
   {
     title: "Multi-Agent Research Dossier",

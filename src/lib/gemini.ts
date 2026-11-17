@@ -1033,7 +1033,7 @@ export function preRouteDeterministicIntent(
   }
 
   const hasRideKeyword = /\b(?:uber|cab|ride|auto|bike|moto|taxi|transit|driver)\b/i.test(lower);
-  const isUberEstimate = hasRideKeyword && /\b(?:how\s+much\s+(?:is|will|for)|fare|tariff|estimate|cost\s+of|rates?|pricing)\b/i.test(lower);
+  const isUberEstimate = hasRideKeyword && /\b(?:how\s+much\s+(?:is|will|for)|fare|tariff|estimate|cost\s+of|rates?|pricing|options?|available|availability|distance|route)\b/i.test(lower);
   const isUberBooking = hasRideKeyword && !isUberEstimate && (
     /\b(?:book|call|order|reserve|dispatch)\b/i.test(lower) || 
     /\b(?:take\s+me\s+to|need\s+a\s+ride|need\s+an?\s+(?:auto|cab|ride|uber|bike|taxi))\b/i.test(lower)
@@ -1134,6 +1134,29 @@ export function preRouteDeterministicIntent(
       }, pendingAction, channelName);
     }
 
+    if (!route.uberServiceAvailable) {
+      return attachSafetyAndTraces({
+        type: 'general',
+        agent: 'UBER',
+        action: 'unavailable',
+        params: {
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
+          distanceKm: route.distanceKm,
+          googleMapsUrl: route.googleMapsUrl,
+        },
+        response: `⚠️ **Uber Cab Dispatch is Unavailable in Kolhapur / Atigre**\n\n` +
+          `Uber does not operate local intra-city taxi services in the Kolhapur district.\n\n` +
+          `**Verified Real-World Alternatives for ${route.cleanPickup} ➔ ${route.cleanDestination} (${route.distanceKm} km via NH 166):**\n\n` +
+          `1. 🛺 **Special Auto from SGU Gate:** Walk to the auto stand stationed outside SGU Main Gate (Fare: ~₹250 – ₹300, ~40 mins direct drop).\n` +
+          `2. 🛺 **Shared 6-Seater / Vadap Auto:** Regular pickups on NH 166 heading to CBS / Station (Fare: ₹35 – ₹50 / seat).\n` +
+          `3. 🚌 **MSRTC ST Bus from Atigre Phata:** Buses depart every 10–15 mins to Kolhapur CBS (Fare: ₹25 – ₹35, ~38 mins).\n` +
+          `4. 🚕 **Local Private Taxi:** Available via city taxi operators (Fare: ~₹550 – ₹700).\n\n` +
+          `📍 **[Open Driving Route & Transit Navigation on Google Maps](${route.googleMapsUrl})**`,
+        explanation: `Informed user that Uber is not operational in ${route.regionName} and provided verified local transit alternatives.`,
+      }, pendingAction, channelName);
+    }
+
     if (!explicitlySpecifiedTier) {
       return attachSafetyAndTraces({
         type: 'general',
@@ -1148,22 +1171,14 @@ export function preRouteDeterministicIntent(
         response: `🚗 **Please Select a Vehicle Tier to Authorize Dispatch**\n\n` +
           `• **Route:** ${route.cleanPickup} ➔ ${route.cleanDestination} (~${route.distanceKm} km via ${route.routeVia})\n\n` +
           `Which vehicle type would you like to dispatch?\n` +
-          `• 🛺 **Uber Auto / Local Auto** (Budget 3-wheeler: ₹${route.tiers[0].minFare} – ₹${route.tiers[0].maxFare})\n` +
-          `• 🚗 **Uber Go** (Compact AC 4-seater: ₹${route.tiers[1].minFare} – ₹${route.tiers[1].maxFare})\n` +
-          `• 🚘 **Uber Premier** (Executive sedan: ₹${route.tiers[2].minFare} – ₹${route.tiers[2].maxFare})\n` +
-          `• 🚐 **Uber XL** (6-seater SUV: ₹${route.tiers[3].minFare} – ₹${route.tiers[3].maxFare})\n` +
-          `• 🏍️ **Uber Moto** (Solo 2-wheeler: ₹${route.tiers[4].minFare} – ₹${route.tiers[4].maxFare})\n\n` +
-          `Reply with your preferred option (e.g., **"Dispatch Uber Go"**) to confirm.`,
+          route.tiers.filter(t => t.availableLocally).map(t => `• ${t.icon} **${t.name}** (${t.fareRange})`).join('\n') +
+          `\n\nReply with your preferred option (e.g., **"Dispatch Uber Go"**) to confirm.`,
         explanation: 'Clarification requested: vehicle tier selection is required before dispatching a ride.',
       }, pendingAction, channelName);
     }
 
     const tierObj = route.tiers.find(t => t.name.toLowerCase().includes(detectedTier.toLowerCase())) || route.tiers[1];
-    const lockedFare = `₹${tierObj.minFare} – ₹${tierObj.maxFare}`;
-
-    const regionalNote = route.isRegionalTier2
-      ? `\n\n⚠️ **Kolhapur & SGU Regional Transit Notice:**\n• In Atigre / Kolhapur highway corridors, on-demand cabs operate with intermittent driver density.\n• Local Auto-Rickshaws (stationed at SGU Main Gate) and City Taxis operate 24/7 along NH 166.\n• Confirming below opens the official Uber app pre-filled for 1-click driver matching.`
-      : '';
+    const lockedFare = tierObj.fareRange;
 
     return attachSafetyAndTraces({
       type: 'action_stage',
@@ -1177,7 +1192,7 @@ export function preRouteDeterministicIntent(
         selected_tier: tierObj.name,
         tier: tierObj.name,
         locked_fare: lockedFare,
-        fare: Math.round((tierObj.minFare + tierObj.maxFare) / 2),
+        fare: tierObj.minFare || 250,
         distance: `${route.distanceKm} km`,
         duration: `${route.durationMins} mins`,
         routeVia: route.routeVia,
@@ -1188,10 +1203,10 @@ export function preRouteDeterministicIntent(
         rawPrompt: trimmed,
         userPrompt: trimmed,
       },
-      explanation: `🚗 **Mobility Dispatch Request Staged**\n\nI have verified your transit route and tariff parameters:\n\n• **Pickup:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Service Tier:** ${tierObj.name}\n• **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : ''}\n• **Estimated Tariff:** ${lockedFare}${regionalNote}\n\n*Review parameters below and authorize dispatch to open Uber.*`,
+      explanation: `🚗 **Mobility Dispatch Request Staged**\n\nI have verified your transit route and tariff parameters:\n\n• **Pickup:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Service Tier:** ${tierObj.name}\n• **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : ''}\n• **Estimated Tariff:** ${lockedFare}\n\n*Review parameters below and authorize dispatch to open Uber.*`,
       confirmationDetails: {
         title: `Dispatch ${tierObj.name}`,
-        warning: 'Safety Check: Review verified route and regional availability before authorizing dispatch.',
+        warning: 'Safety Check: Review verified route before authorizing dispatch.',
         summary: `${tierObj.name} • ${route.cleanPickup} ➔ ${route.cleanDestination} (${lockedFare})`,
         details: {
           tier: tierObj.name,
@@ -2251,8 +2266,31 @@ Return ONLY valid JSON matching the schema.
       }, null, channelName);
     }
 
+    if (!route.uberServiceAvailable) {
+      return attachSafetyAndTraces({
+        type: 'general',
+        agent: 'UBER',
+        action: 'unavailable',
+        params: {
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
+          distanceKm: route.distanceKm,
+          googleMapsUrl: route.googleMapsUrl,
+        },
+        response: `⚠️ **Uber Cab Dispatch is Unavailable in Kolhapur / Atigre**\n\n` +
+          `Uber does not operate local intra-city taxi services in the Kolhapur district.\n\n` +
+          `**Verified Real-World Alternatives for ${route.cleanPickup} ➔ ${route.cleanDestination} (${route.distanceKm} km via NH 166):**\n\n` +
+          `1. 🛺 **Special Auto from SGU Gate:** Walk to the auto stand stationed outside SGU Main Gate (Fare: ~₹250 – ₹300, ~40 mins direct drop).\n` +
+          `2. 🛺 **Shared 6-Seater / Vadap Auto:** Regular pickups on NH 166 heading to CBS / Station (Fare: ₹35 – ₹50 / seat).\n` +
+          `3. 🚌 **MSRTC ST Bus from Atigre Phata:** Buses depart every 10–15 mins to Kolhapur CBS (Fare: ₹25 – ₹35, ~38 mins).\n` +
+          `4. 🚕 **Local Private Taxi:** Available via city taxi operators (Fare: ~₹550 – ₹700).\n\n` +
+          `📍 **[Open Driving Route & Transit Navigation on Google Maps](${route.googleMapsUrl})**`,
+        explanation: `Informed user that Uber is not operational in ${route.regionName} and provided verified local transit alternatives.`,
+      }, null, channelName);
+    }
+
     const tierObj = route.tiers.find(t => t.name.toLowerCase().includes(detectedTier.toLowerCase())) || route.tiers[1];
-    const lockedFare = `₹${tierObj.minFare} – ₹${tierObj.maxFare}`;
+    const lockedFare = tierObj.fareRange;
 
     return attachSafetyAndTraces({
       type: 'action_stage',
@@ -2265,7 +2303,7 @@ Return ONLY valid JSON matching the schema.
         selected_tier: tierObj.name,
         tier: tierObj.name,
         locked_fare: lockedFare,
-        fare: Math.round((tierObj.minFare + tierObj.maxFare) / 2),
+        fare: tierObj.minFare || 250,
         distance: `${route.distanceKm} km`,
         duration: `${route.durationMins} mins`,
         routeVia: route.routeVia,
