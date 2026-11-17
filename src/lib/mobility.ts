@@ -176,6 +176,116 @@ const KNOWN_LOCATIONS: KnownLocation[] = [
     state: "Karnataka",
     uberOperational: true,
   },
+  {
+    name: "KSR Bengaluru City Railway Station (Majestic)",
+    aliases: ["bangalore city station", "majestic station", "ksr bengaluru", "bangalore station", "majestic"],
+    lat: 12.9781,
+    lng: 77.5696,
+    city: "Bangalore",
+    state: "Karnataka",
+    uberOperational: true,
+  },
+  {
+    name: "Koramangala (Bangalore)",
+    aliases: ["koramangala"],
+    lat: 12.9352,
+    lng: 77.6245,
+    city: "Bangalore",
+    state: "Karnataka",
+    uberOperational: true,
+  },
+  {
+    name: "Indiranagar (Bangalore)",
+    aliases: ["indiranagar", "indira nagar"],
+    lat: 12.9784,
+    lng: 77.6408,
+    city: "Bangalore",
+    state: "Karnataka",
+    uberOperational: true,
+  },
+  {
+    name: "Whitefield (Bangalore)",
+    aliases: ["whitefield", "itpl"],
+    lat: 12.9698,
+    lng: 77.7499,
+    city: "Bangalore",
+    state: "Karnataka",
+    uberOperational: true,
+  },
+  // Hyderabad Hubs (Telangana)
+  {
+    name: "Rajiv Gandhi International Airport (RGIA / Hyderabad)",
+    aliases: ["rajiv gandhi international airport", "rgia", "hyderabad airport", "shamshabad airport", "hyd airport", "rajiv gandhi airport"],
+    lat: 17.2403,
+    lng: 78.4294,
+    city: "Hyderabad",
+    state: "Telangana",
+    uberOperational: true,
+  },
+  {
+    name: "Begumpet Railway Station (Hyderabad)",
+    aliases: ["begumpet railway station", "begumpet station", "begumpet"],
+    lat: 17.4375,
+    lng: 78.4683,
+    city: "Hyderabad",
+    state: "Telangana",
+    uberOperational: true,
+  },
+  {
+    name: "Secunderabad Railway Station (Hyderabad)",
+    aliases: ["secunderabad railway station", "secunderabad station", "secunderabad", "sc station"],
+    lat: 17.4344,
+    lng: 78.5017,
+    city: "Hyderabad",
+    state: "Telangana",
+    uberOperational: true,
+  },
+  {
+    name: "Hitec City / Cyberabad (Hyderabad)",
+    aliases: ["hitec city", "hitex", "cyberabad", "madhapur", "gachibowli"],
+    lat: 17.4474,
+    lng: 78.3762,
+    city: "Hyderabad",
+    state: "Telangana",
+    uberOperational: true,
+  },
+  {
+    name: "Hyderabad Deccan Railway Station (Nampally)",
+    aliases: ["nampally station", "hyderabad station", "nampally", "hyderabad deccan"],
+    lat: 17.3916,
+    lng: 78.4688,
+    city: "Hyderabad",
+    state: "Telangana",
+    uberOperational: true,
+  },
+  // Delhi NCR Hubs
+  {
+    name: "Indira Gandhi International Airport (DEL / New Delhi)",
+    aliases: ["delhi airport", "del", "igi airport", "t3 delhi"],
+    lat: 28.5562,
+    lng: 77.1000,
+    city: "Delhi",
+    state: "Delhi",
+    uberOperational: true,
+  },
+  {
+    name: "New Delhi Railway Station (NDLS)",
+    aliases: ["new delhi railway station", "ndls", "delhi station"],
+    lat: 28.6429,
+    lng: 77.2195,
+    city: "Delhi",
+    state: "Delhi",
+    uberOperational: true,
+  },
+  {
+    name: "Connaught Place (CP / New Delhi)",
+    aliases: ["connaught place", "cp delhi", "cp"],
+    lat: 28.6304,
+    lng: 77.2177,
+    city: "Delhi",
+    state: "Delhi",
+    uberOperational: true,
+  },
 ];
 
 /**
@@ -260,9 +370,9 @@ export function calculateMobilityRoute(pickupRaw: string, destinationRaw: string
   // Uber does NOT operate local intra-city cabs in Kolhapur district
   const uberServiceAvailable = !isKolhapurZone && (locA ? locA.uberOperational : true) && (locB ? locB.uberOperational : true);
 
-  let distanceKm = 15.0;
+  let distanceKm = 18.0;
   let durationMins = 35;
-  let routeVia = "NH 166 Arterial Highway";
+  let routeVia = "Express City Corridor";
   let isRegionalTier2 = isKolhapurZone;
   let regionName = isKolhapurZone ? "Kolhapur (Maharashtra)" : (locA?.city || locB?.city || "Metro Transit Corridor");
 
@@ -273,9 +383,25 @@ export function calculateMobilityRoute(pickupRaw: string, destinationRaw: string
 
   if (locA && locB) {
     const directKm = calculateHaversineDistance(locA.lat, locA.lng, locB.lat, locB.lng);
-    distanceKm = parseFloat((directKm * 1.28).toFixed(1));
-    durationMins = Math.max(10, Math.round(distanceKm * 1.9 + 2));
-    routeVia = `NH 166 Corridor (${locA.name.split('(')[0].trim()} ➔ ${locB.name.split('(')[0].trim()})`;
+    const multiplier = (locA.city === 'Hyderabad' || locA.city === 'Bangalore' || locA.city === 'Delhi') ? 1.45 : 1.32;
+    distanceKm = parseFloat((directKm * multiplier).toFixed(1));
+    durationMins = Math.max(12, Math.round(distanceKm * 1.5 + 4));
+
+    if (locA.city === 'Hyderabad' || locB.city === 'Hyderabad') {
+      routeVia = 'PVNR Elevated Expressway & Airport Corridor';
+    } else if (locA.city === 'Bangalore' || locB.city === 'Bangalore') {
+      routeVia = 'Outer Ring Road / Airport Expressway Corridor';
+    } else if (locA.city === 'Pune' || locB.city === 'Pune') {
+      routeVia = 'Pune City Expressway Corridor';
+    } else if (locA.city === 'Mumbai' || locB.city === 'Mumbai') {
+      routeVia = 'Western Express Highway Corridor';
+    } else if (locA.city === 'Delhi' || locB.city === 'Delhi') {
+      routeVia = 'Delhi Airport Expressway / Ring Road';
+    } else if (isKolhapurZone) {
+      routeVia = `NH 166 Corridor (${locA.name.split('(')[0].trim()} ➔ ${locB.name.split('(')[0].trim()})`;
+    } else {
+      routeVia = `Direct Arterial Corridor (${locA.name.split('(')[0].trim()} ➔ ${locB.name.split('(')[0].trim()})`;
+    }
   } else if (isSguA && isKolhapurStationB) {
     distanceKm = 19.5;
     durationMins = 38;
@@ -288,6 +414,28 @@ export function calculateMobilityRoute(pickupRaw: string, destinationRaw: string
     distanceKm = 22.0;
     durationMins = 42;
     routeVia = "NH 166 & Ujalaiwadi Airport Link Road";
+  } else {
+    // Dynamic fallback when locations aren't pre-indexed
+    if (combined.includes('hyderabad') || combined.includes('begumpet') || combined.includes('rgia') || combined.includes('rajiv gandhi')) {
+      distanceKm = 33.5;
+      durationMins = 45;
+      routeVia = 'PVNR Elevated Expressway & Airport Corridor';
+      regionName = 'Hyderabad (Telangana)';
+    } else if (combined.includes('bangalore') || combined.includes('bengaluru') || combined.includes('kempegowda') || combined.includes('blr')) {
+      distanceKm = 35.0;
+      durationMins = 55;
+      routeVia = 'Bellary Road / Airport Expressway Corridor';
+      regionName = 'Bangalore (Karnataka)';
+    } else if (combined.includes('mumbai') || combined.includes('csmt') || combined.includes('bkc')) {
+      distanceKm = 18.0;
+      durationMins = 40;
+      routeVia = 'Western Express Highway / Bandra-Worli Sea Link';
+      regionName = 'Mumbai (Maharashtra)';
+    } else {
+      distanceKm = 18.0;
+      durationMins = 35;
+      routeVia = 'Direct City Arterial Corridor';
+    }
   }
 
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(cleanPickup)}&destination=${encodeURIComponent(cleanDestination)}&travelmode=driving`;
