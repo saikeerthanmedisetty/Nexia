@@ -195,6 +195,7 @@ export function extractCleanLocationAndSchedule(raw: string): { location: string
   }
 
   text = text
+    .replace(/^(?:to|from|at|drop(?:\s*off)?(?:\s*at)?|pickup(?:\s*at)?)\s+/i, '')
     .replace(/\b(in an auto|by bike|by auto|in uber|by uber|in cab|by cab|please|now|fast|urgently|asap)\b/gi, '')
     .replace(/\s+/g, ' ')
     .replace(/[,\.\?!]+$/, '')

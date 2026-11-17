@@ -213,6 +213,7 @@ export async function executeAgent(
     }
 
     if (!route.uberServiceAvailable) {
+      const responseText = formatMobilityResponse(route);
       return {
         success: true,
         data: {
@@ -221,14 +222,7 @@ export async function executeAgent(
           destination: route.cleanDestination,
           distance_km: route.distanceKm,
           googleMapsUrl: route.googleMapsUrl,
-          message: `⚠️ **Uber Cab Dispatch is Unavailable in Kolhapur / Atigre**\n\n` +
-            `Uber does not operate local intra-city taxi services in the Kolhapur district.\n\n` +
-            `**Verified Real-World Alternatives for ${route.cleanPickup} ➔ ${route.cleanDestination} (${route.distanceKm} km via NH 166):**\n` +
-            `1. 🛺 **Special Auto from SGU Gate:** Walk to the auto stand stationed outside SGU Main Gate (Fare: ~₹250 – ₹300, ~40 mins direct drop).\n` +
-            `2. 🛺 **Shared 6-Seater / Vadap Auto:** Regular pickups on NH 166 heading to CBS / Station (Fare: ₹35 – ₹50 / seat).\n` +
-            `3. 🚌 **MSRTC ST Bus from Atigre Phata:** Buses depart every 10–15 mins to Kolhapur CBS (Fare: ₹25 – ₹35, ~38 mins).\n` +
-            `4. 🚕 **Local Private Taxi:** Available via city taxi operators (Fare: ~₹550 – ₹700).\n\n` +
-            `📍 **[Open Driving Route & Transit Navigation on Google Maps](${route.googleMapsUrl})**`,
+          message: responseText,
         },
       };
     }
