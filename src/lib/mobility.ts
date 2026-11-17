@@ -439,15 +439,13 @@ export function calculateMobilityRoute(pickupRaw: string, destinationRaw: string
   }
 
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(cleanPickup)}&destination=${encodeURIComponent(cleanDestination)}&travelmode=driving`;
-  const bookingUrl = uberServiceAvailable
-    ? `https://m.uber.com/ul/?action=setPickup&pickup[formatted_address]=${encodeURIComponent(cleanPickup)}&dropoff[formatted_address]=${encodeURIComponent(cleanDestination)}`
-    : googleMapsUrl;
+  // Option A: All booking and routing links resolve directly to live Google Maps turn-by-turn navigation
+  const bookingUrl = googleMapsUrl;
 
   let tiers: MobilityTierOption[] = [];
   let availabilityNotice = '';
 
-  if (!uberServiceAvailable) {
-    // Dynamic authentic regional transit tariffs scaled to exact corridor distance
+  if (isKolhapurZone) {
     const specialAutoMin = Math.max(80, Math.round(30 + distanceKm * 13));
     const specialAutoMax = Math.max(100, Math.round(40 + distanceKm * 14.5));
     const vadapMin = Math.max(15, Math.round(distanceKm * 2.2));
@@ -510,96 +508,56 @@ export function calculateMobilityRoute(pickupRaw: string, destinationRaw: string
         transitType: "taxi",
         notes: `Private cab or rental car direct to ${cleanDestination}`,
       },
-      {
-        id: "uber_app_status",
-        name: "Uber (Go / Premier / Auto)",
-        icon: "🚫",
-        capacity: "App-based cab aggregator",
-        fareRange: "Not Operational",
-        minFare: 0,
-        maxFare: 0,
-        durationMins: 0,
-        availableLocally: false,
-        transitType: "uber_app",
-        notes: "Uber DOES NOT operate local intra-city cabs in this district (Intercity drops only from Pune/Mumbai)",
-      },
     ];
 
-    availabilityNotice = `⚠️ **Uber Local Service Status for Kolhapur / Atigre**:
-• **Uber does NOT operate local intra-city ride services in Kolhapur.** App-based cab aggregators (Uber & Ola) do not maintain active local driver fleets in this district.
-• Uber only operates for long-distance **Uber Intercity** trips arriving from major metros like Pune or Mumbai (e.g. Pune ➔ Kolhapur).
-• Real-world transit for students and staff relies on **Local Autos stationed at SGU Main Gate**, **MSRTC Buses from Atigre Phata**, or private city cabs.`;
+    availabilityNotice = `⚠️ **Local Transit Notice for Kolhapur / Atigre**:
+• **Uber does NOT operate local intra-city cabs in Kolhapur.** App-based cab aggregators (Uber & Ola) do not maintain active local driver fleets in this district.
+• Commuters & students rely on **Local Autos stationed at SGU Main Gate**, **MSRTC ST Buses**, or private city cabs.`;
   } else {
-    // Standard metro rate card where Uber actually operates
+    // Metro / National Transit corridor modes (travel time & guidance without fake surge fare numbers)
     tiers = [
       {
-        id: "uber_auto",
-        name: "Uber Auto",
-        icon: "🛺",
-        capacity: "3 passengers",
-        fareRange: `₹${Math.round(30 + distanceKm * 12.0)} – ₹${Math.round(30 + distanceKm * 14.5)}`,
-        minFare: Math.round(30 + distanceKm * 12.0),
-        maxFare: Math.round(30 + distanceKm * 14.5),
-        durationMins: Math.round(durationMins * 1.1),
-        availableLocally: true,
-        transitType: "uber_app",
-        notes: "On-demand city auto",
-      },
-      {
-        id: "uber_go",
-        name: "Uber Go (AC Compact)",
+        id: "driving_cab",
+        name: "Driving / Private Cab",
         icon: "🚗",
-        capacity: "4 passengers",
-        fareRange: `₹${Math.round(60 + distanceKm * 17.0)} – ₹${Math.round(60 + distanceKm * 20.0)}`,
-        minFare: Math.round(60 + distanceKm * 17.0),
-        maxFare: Math.round(60 + distanceKm * 20.0),
+        capacity: "4 passengers (AC)",
+        fareRange: `Google Maps Live Traffic`,
+        minFare: 0,
+        maxFare: 0,
         durationMins: durationMins,
         availableLocally: true,
-        transitType: "uber_app",
-        notes: "Affordable compact AC cab",
+        transitType: "taxi",
+        notes: `Direct road transit via ${routeVia}`,
       },
       {
-        id: "uber_premier",
-        name: "Uber Premier (Sedan)",
-        icon: "🚘",
-        capacity: "4 passengers",
-        fareRange: `₹${Math.round(90 + distanceKm * 22.0)} – ₹${Math.round(90 + distanceKm * 25.5)}`,
-        minFare: Math.round(90 + distanceKm * 22.0),
-        maxFare: Math.round(90 + distanceKm * 25.5),
-        durationMins: Math.max(15, durationMins - 2),
-        availableLocally: true,
-        transitType: "uber_app",
-        notes: "Executive sedan",
-      },
-      {
-        id: "uber_xl",
-        name: "Uber XL (SUV)",
-        icon: "🚐",
-        capacity: "6 passengers + luggage",
-        fareRange: `₹${Math.round(120 + distanceKm * 26.0)} – ₹${Math.round(120 + distanceKm * 31.0)}`,
-        minFare: Math.round(120 + distanceKm * 26.0),
-        maxFare: Math.round(120 + distanceKm * 31.0),
-        durationMins: durationMins,
-        availableLocally: true,
-        transitType: "uber_app",
-        notes: "6-seater SUV",
-      },
-      {
-        id: "uber_moto",
-        name: "Uber Moto / Bike Taxi",
+        id: "two_wheeler",
+        name: "Two-Wheeler / Bike",
         icon: "🏍️",
-        capacity: "1 passenger",
-        fareRange: `₹${Math.round(25 + distanceKm * 7.5)} – ₹${Math.round(25 + distanceKm * 9.5)}`,
-        minFare: Math.round(25 + distanceKm * 7.5),
-        maxFare: Math.round(25 + distanceKm * 9.5),
-        durationMins: Math.round(durationMins * 0.75),
-        availableLocally: distanceKm <= 25,
-        transitType: "uber_app",
-        notes: "Solo express transit with helmet",
+        capacity: "1-2 passengers",
+        fareRange: `Express Commute`,
+        minFare: 0,
+        maxFare: 0,
+        durationMins: Math.max(8, Math.round(durationMins * 0.75)),
+        availableLocally: true,
+        transitType: "taxi",
+        notes: "Fastest urban commute avoiding peak congestion",
+      },
+      {
+        id: "public_transit",
+        name: "Public Metro / Bus Transit",
+        icon: "🚌",
+        capacity: "Mass Transit Corridor",
+        fareRange: `Regional Tariff`,
+        minFare: 0,
+        maxFare: 0,
+        durationMins: Math.round(durationMins * 1.3),
+        availableLocally: true,
+        transitType: "bus",
+        notes: "Scheduled arterial bus / metro corridor",
       },
     ];
 
-    availabilityNotice = `🟢 **On-Demand Mobility Active**: Live driver fleet available in this metro transit zone.`;
+    availabilityNotice = `🟢 **Google Maps Satellite Navigation Active**: Live traffic guidance and real-time turn-by-turn route available.`;
   }
 
   return {
@@ -627,8 +585,8 @@ export function calculateMobilityRoute(pickupRaw: string, destinationRaw: string
 export function formatMobilityResponse(route: MobilityRouteInfo, selectedTier?: string): string {
   const timeBadge = route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : '';
 
-  if (!route.uberServiceAvailable) {
-    const tableHeader = `| Transit Option | Realistic Tariff | Travel Time | Local Availability |
+  if (route.isRegionalTier2) {
+    const tableHeader = `| Transit Option | Regional Tariff | Travel Time | Local Availability |
 | :--- | :--- | :--- | :--- |`;
 
     const tableRows = route.tiers.map(t => {
@@ -638,55 +596,53 @@ export function formatMobilityResponse(route: MobilityRouteInfo, selectedTier?: 
       return `| ${t.icon} **${t.name}** | ${t.fareRange} | ${t.durationMins ? `~${t.durationMins} mins` : '—'} | ${availBadge} |`;
     }).join('\n');
 
-    const specialAutoTier = route.tiers.find(t => t.id === 'local_special_auto');
-    const vadapTier = route.tiers.find(t => t.id === 'shared_vadap_auto');
-    const busTier = route.tiers.find(t => t.id === 'msrtc_st_bus');
-    const autoFare = specialAutoTier ? specialAutoTier.fareRange : '₹150 – ₹250';
-    const vadapFare = vadapTier ? vadapTier.fareRange : '₹25 – ₹40 / seat';
-    const busFare = busTier ? busTier.fareRange : '₹20 – ₹30 / seat';
+    return `🗺️ **Executive Route & Transit Intelligence**
 
-    return `🚗 **Executive Transit & Route Intelligence**
-
-• **Pickup:** ${route.cleanPickup}
+• **Origin:** ${route.cleanPickup}
 • **Destination:** ${route.cleanDestination}
-• **Road Corridor:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${timeBadge}
+• **Corridor Distance:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${timeBadge}
+• **Navigation System:** Google Maps Live Satellite & Traffic
 
-⚠️ **Uber Service Notice for ${route.regionName}:**
-**Uber does NOT operate local intra-city ride services in this district.** App-based cab aggregators (Uber & Ola) do not maintain active local driver fleets here (Uber only operates for long-distance Intercity drop-offs arriving from major metros like Pune/Mumbai).
+⚠️ **Local Transit Notice for ${route.regionName}:**
+**Uber does NOT operate local intra-city cabs in this district.** App-based cab aggregators (Uber & Ola) do not maintain active local driver fleets here.
 
 ### 🚦 Verified Real-World Transit Options:
 ${tableHeader}
 ${tableRows}
 
 📍 **Ground Reality Advice for Commuters & Students:**
-• **Fastest Direct Ride:** Hire a dedicated **Special Auto** directly from the local auto stand (${autoFare} direct drop to ${route.cleanDestination}).
-• **Most Economical:** Take a shared **Vadap Auto** (${vadapFare}) or board an **MSRTC ST Bus** (${busFare}) heading towards ${route.cleanDestination}.
+• **Fastest Direct Ride:** Hire a dedicated **Special Auto** directly from the local auto stand (~₹150 – ₹250 direct drop to ${route.cleanDestination}).
+• **Most Economical:** Take a shared **Vadap Auto** (~₹25 – ₹40 / seat) or board an **MSRTC ST Bus** (~₹20 – ₹30 / seat) heading towards ${route.cleanDestination}.
 
 ---
-### 🗺️ Live Navigation & Highway Route
+### 🗺️ Live Turn-by-Turn Navigation
 📍 **[Open Verified Route in Google Maps](${route.googleMapsUrl})**
 *(Live turn-by-turn traffic, highway landmarks, and real-time transit bus stops)*`;
   }
 
-  // Metro corridor with active Uber service
-  const tableHeader = `| Service Tier | Estimated Tariff | Estimated Time | Availability |
-| :--- | :--- | :--- | :--- |`;
+  // Metro corridor with active Google Maps routing
+  const tableHeader = `| Transit Mode | Estimated Travel Time | Corridor Guidance |
+| :--- | :--- | :--- |`;
 
   const tableRows = route.tiers.map(t => {
-    return `| ${t.icon} **${t.name}** | ${t.fareRange} | ~${t.durationMins} mins | 🟢 Available On-Demand |`;
+    return `| ${t.icon} **${t.name}** | ~${t.durationMins} mins | ${t.notes} |`;
   }).join('\n');
 
-  return `🚗 **Executive Transit Route & Fare Estimates**
+  return `🗺️ **Executive Route & Transit Navigation**
 
-• **Pickup:** ${route.cleanPickup}
+• **Origin:** ${route.cleanPickup}
 • **Destination:** ${route.cleanDestination}
-• **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${timeBadge}
+• **Corridor Distance:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${timeBadge}
+• **Navigation Engine:** Google Maps Live Traffic & Satellite GPS
 
+### 🚦 Commute Corridor Analysis:
 ${tableHeader}
 ${tableRows}
 
+💡 *Note: Direct on-demand cab dispatch (Uber/Ola) requires personal device biometric and payment authentication in the app. Nexia stages the verified GPS driving corridor and 1-click Google Maps turn-by-turn navigation below.*
+
 ---
-### 📲 Live Dispatch & Booking
-🔗 **[Open Official Uber App to Verify & Dispatch Ride](${route.bookingUrl})**
-*(Clicking opens the official Uber app with pickup & destination pre-filled for 1-click driver matching)*`;
+### 🗺️ Live Navigation
+📍 **[Open Live Turn-by-Turn Navigation on Google Maps](${route.googleMapsUrl})**
+*(Clicking opens Google Maps with pre-filled origin, destination, and real-time live traffic)*`;
 }

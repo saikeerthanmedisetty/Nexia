@@ -5,7 +5,7 @@ import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import type { AgentTask } from './AgentActivity';
 import { HITLCard, PendingAction } from './HITLCard';
-import { Bot, Sparkles, Shield, ArrowDown, Brain, Calendar, Mail, Receipt, Car, ArrowRight, Briefcase, Video, Search } from 'lucide-react';
+import { Bot, Sparkles, Shield, ArrowDown, Brain, Calendar, Mail, Receipt, Car, ArrowRight, Briefcase, Video, Search, Navigation } from 'lucide-react';
 import type { TraceStep } from '@/lib/gemini';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -69,10 +69,10 @@ const DEMO_SCENARIOS = [
     prompt: "Stage an unlisted YouTube video upload for our Nexia technical demonstration with custom 16:9 thumbnail and high-CTR SEO tags",
   },
   {
-    title: "Transit to Station",
-    tag: "Mobility Intelligence",
-    icon: <Car size={13} />,
-    prompt: "Check transit options and road distance from Sanjay Ghodawat University main gate to Kolhapur Railway Station for tomorrow 9 AM",
+    title: "Route Navigation",
+    tag: "Google Maps Routing",
+    icon: <Navigation size={13} />,
+    prompt: "Show route and driving navigation from Begumpet Railway Station to Rajiv Gandhi International Airport",
   },
   {
     title: "Multi-Agent Research Dossier",

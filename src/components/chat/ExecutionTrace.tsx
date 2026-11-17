@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Activity,
   Check,
-  Briefcase
+  Briefcase,
+  Navigation
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TraceStep } from '@/lib/gemini';
@@ -43,7 +44,7 @@ export function ExecutionTrace({ steps, tasks = [], isActive = false }: Executio
       case 'CALENDAR':
         return <Calendar size={12} className="text-indigo-600 dark:text-indigo-400" />;
       case 'UBER':
-        return <Car size={12} className="text-emerald-500 dark:text-emerald-400" />;
+        return <Navigation size={12} className="text-emerald-500 dark:text-emerald-400" />;
       case 'SHEETS':
         return <Table size={12} className="text-emerald-600 dark:text-emerald-400" />;
       case 'YOUTUBE':

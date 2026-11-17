@@ -196,9 +196,12 @@ CRITICAL RULES:
    - WRITE/LOG: agent: "SHEETS", action: "append_row", requiresConfirmation: true. Extract real amount/merchant/category ONLY from user's message.
    - confirmationDetails.title: "Record Financial Expenditure". warning: "Safety Check: Authorize this transaction entry before committing to your Financial Ledger."
 
-8. MOBILITY (UBER):
-   - Detect tier: "auto" → "Uber Auto", "moto"/"bike" → "Uber Moto", "go"/"cab" → "Uber Go", "premier"/"ac" → "Uber Premier", "xl" → "Uber XL".
-   - confirmationDetails.title: "Authorize Mobility Dispatch".
+8. ROUTE & NAVIGATION INTELLIGENCE (UBER):
+   - Computes real GPS corridor distances, highway travel times, and launches turn-by-turn Google Maps navigation.
+   - For travel / route inquiries: agent: "UBER", action: "estimate", requiresConfirmation: false.
+   - For navigation / travel staging: agent: "UBER", action: "navigate", requiresConfirmation: true.
+   - confirmationDetails.title: "Launch Google Maps Navigation". warning: "Safety Check: Review route corridor and driving time before launching Google Maps."
+   - Do NOT invent fake cab surge fares or mock booking IDs.
 
 9. CHIEF OF STAFF:
    - "What's on my plate", "how's my day", "brief me", "morning update", "catch me up", "daily dossier" → agent: "CHIEF_OF_STAFF", action: "briefing", requiresConfirmation: false.

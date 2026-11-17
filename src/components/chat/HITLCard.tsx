@@ -36,7 +36,8 @@ import {
   Plus,
   Clock,
   ChevronDown,
-  MapPin
+  MapPin,
+  Navigation,
 } from 'lucide-react';
 import { cn, sanitizeExecutiveTerminology, formatToISTTime } from '@/lib/utils';
 import { YouTubeReviewCard, YouTubePayload } from './YouTubeReviewCard';
@@ -230,8 +231,9 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
   const handleConfirm = async () => {
     setIsExecuting(true);
     try {
-      if (isUber && p.bookingUrl && typeof window !== 'undefined') {
-        window.open(p.bookingUrl, '_blank', 'noopener,noreferrer');
+      if (isUber && typeof window !== 'undefined') {
+        const mapsUrl = p.googleMapsUrl || (p.bookingUrl?.includes('google.com') ? p.bookingUrl : `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(p.pickup || '')}&destination=${encodeURIComponent(p.destination || '')}&travelmode=driving`);
+        window.open(mapsUrl, '_blank', 'noopener,noreferrer');
       }
 
       const finalParams = isEmail ? {
@@ -269,7 +271,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
     : isCalendar
     ? 'Schedule Executive Calendar Event'
     : isUber
-    ? 'Authorize Mobility Dispatch'
+    ? 'Executive Route & Navigation'
     : 'Authorize Action';
 
   const defaultWarning = isDeleteAction
@@ -281,7 +283,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
     : isCalendar
     ? 'Safety Check: Confirm event details before blocking on your Executive Schedule.'
     : isUber
-    ? 'Safety Check: Review route parameters before dispatching vehicle.'
+    ? 'Safety Check: Review route corridor and driving time before launching Google Maps navigation.'
     : 'Safety Check: Review the parameters before executing.';
 
   const details = action.confirmationDetails;
@@ -360,10 +362,10 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
     heroCategory = 'Outbound Dispatch';
     heroMerchant = 'Encrypted TLS';
   } else if (isUber) {
-    heroMain = p.locked_fare || (p.fare ? `₹${p.fare}` : 'Dynamic Tariff');
-    heroSub = `${p.pickup || 'Current Location'} ➔ ${p.destination || 'Destination'}`;
-    heroCategory = p.selected_tier || p.tier || 'Uber Go';
-    heroMerchant = p.routeVia ? `${p.distance || '19.5 km'} via ${p.routeVia}` : (p.distance ? `${p.distance} Route` : 'Official Uber Route');
+    heroMain = `${p.distance || 'GPS Corridor'} (~${p.duration || '30 mins'})`;
+    heroSub = `${p.pickup || 'Origin'} ➔ ${p.destination || 'Destination'}`;
+    heroCategory = 'Google Maps Live Route';
+    heroMerchant = p.routeVia ? `via ${p.routeVia}` : 'Express Highway Corridor';
   } else {
     // Universal fallback for ANY future or arbitrary agent/task
     heroMain = 
@@ -423,9 +425,9 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
     }
     if (isUber) {
       return [
-        { id: 'fu-1', label: 'Reserve 15m buffer on calendar', shortcut: '⌘ 1', prompt: 'Block a 15-minute buffer on my schedule for this trip' },
-        { id: 'fu-2', label: 'Track driver live telemetry', shortcut: '⌘ 2', prompt: 'Track live driver telemetry for my ride' },
-        { id: 'fu-3', label: 'Log trip cost to financial ledger', shortcut: '⌘ 3', prompt: `Log ₹${p.fare || 450} for Uber ride to ${p.destination || 'destination'} in ledger` },
+        { id: 'fu-1', label: 'Block travel buffer on calendar', shortcut: '⌘ 1', prompt: `Block a travel buffer on my schedule for travel to ${p.destination || 'destination'}` },
+        { id: 'fu-2', label: 'Check traffic & weather conditions', shortcut: '⌘ 2', prompt: `What are the current traffic and travel conditions to ${p.destination || 'destination'}?` },
+        { id: 'fu-3', label: 'View destination on Google Maps', shortcut: '⌘ 3', prompt: `Show destination details and satellite overview for ${p.destination || 'destination'}` },
       ];
     }
     return [
@@ -542,7 +544,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
             {!isDeleteAction && isSheets && <Receipt size={22} className="stroke-[2.2]" />}
             {!isDeleteAction && isCalendar && <Calendar size={22} className="stroke-[2.2]" />}
             {!isDeleteAction && isEmail && <Mail size={22} className="stroke-[2.2]" />}
-            {!isDeleteAction && isUber && <Car size={22} className="stroke-[2.2]" />}
+            {!isDeleteAction && isUber && <Navigation size={22} className="stroke-[2.2]" />}
             {!isDeleteAction && !isSheets && !isCalendar && !isEmail && !isUber && <ShieldAlert size={22} className="stroke-[2.2]" />}
           </div>
 
@@ -860,7 +862,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
                       : isCalendar
                       ? ((p.hasConflict || p.conflict) ? '[ OVERRIDE & SCHEDULE ]' : '[ CONFIRM & SCHEDULE ]')
                       : isUber
-                      ? '[ AUTHORIZE DISPATCH & OPEN UBER ]'
+                      ? '[ 🗺️ OPEN GOOGLE MAPS NAVIGATION ]'
                       : `[ CONFIRM & ${action.action?.toUpperCase() || 'EXECUTE'} ]`}
                   </span>
                 </>
@@ -894,7 +896,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
                 : isCalendar
                 ? 'Event confirmed and added to your Executive Schedule! ✅'
                 : isUber
-                ? 'Ride parameters verified! Official Uber App launched with pre-filled route. 🚗'
+                ? 'Route verified! Live Google Maps turn-by-turn navigation launched. 🗺️'
                 : 'Action confirmed and executed successfully! ✅'}
             </span>
           </div>
@@ -927,7 +929,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
               <CheckCircle2 size={12} className={theme.accentText} />
               {isDeleteAction
                 ? 'Target Event to Remove'
-                : isCalendar ? 'Schedule & Venue' : isSheets ? 'Expenditure Item' : isUber ? 'Ride Itinerary' : isEmail ? 'Correspondence' : 'Action Details'}
+                : isCalendar ? 'Schedule & Venue' : isSheets ? 'Expenditure Item' : isUber ? 'Route Parameters' : isEmail ? 'Correspondence' : 'Action Details'}
             </span>
             <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-zinc-400">
               Verified
@@ -1042,7 +1044,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
             {isUber && (
               <>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Pickup:</span>
+                  <span className="text-zinc-400">Origin:</span>
                   <span className="text-zinc-200 truncate max-w-[150px]">{p.pickup || 'Current Location'}</span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -1050,18 +1052,16 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
                   <span className={cn("font-bold truncate max-w-[150px]", theme.accentText)}>{p.destination || 'Destination'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Vehicle Tier:</span>
-                  <span className="text-amber-400 font-semibold">{p.selected_tier || p.tier || 'Uber Go'}</span>
+                  <span className="text-zinc-400">Corridor Distance:</span>
+                  <span className="text-emerald-400 font-semibold">{p.distance || 'Dynamic GPS'}</span>
                 </div>
-                {p.distance && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Route Metric:</span>
-                    <span className="text-zinc-300 font-mono text-[10px]">{p.distance} (~{p.duration || '35 mins'})</span>
-                  </div>
-                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400">Estimated Drive Time:</span>
+                  <span className="text-zinc-200 font-mono text-[10px]">~{p.duration || '30 mins'}</span>
+                </div>
                 {p.scheduledTime && (
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Scheduled:</span>
+                    <span className="text-zinc-400">Departure Time:</span>
                     <span className="text-indigo-300 font-mono text-[10px]">{p.scheduledTime}</span>
                   </div>
                 )}
@@ -1116,7 +1116,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
               <ShieldCheck size={12} className={theme.accentText} />
               {isDeleteAction
                 ? 'Removal Guardrail'
-                : isCalendar ? 'Calendar & Guardrails' : isSheets ? 'Ledger & Audit' : isUber ? 'Dispatch Telemetry' : isEmail ? 'Security & Protocol' : 'Telemetry Guard'}
+                : isCalendar ? 'Calendar & Guardrails' : isSheets ? 'Ledger & Audit' : isUber ? 'Navigation & Telemetry' : isEmail ? 'Security & Protocol' : 'Telemetry Guard'}
             </span>
             <span className={cn(
               "text-[9px] font-mono px-1.5 py-0.5 rounded border",
@@ -1235,21 +1235,21 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
             {isUber && (
               <>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Estimated Tariff:</span>
-                  <span className="text-emerald-400 font-semibold">{p.locked_fare || (p.fare ? `₹${p.fare}` : 'Dynamic Tariff')}</span>
+                  <span className="text-zinc-400">Navigation Engine:</span>
+                  <span className="text-emerald-400 font-semibold">Google Maps Live GPS 🛰️</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Dispatch Mode:</span>
-                  <span className="text-indigo-300">Official Uber App</span>
+                  <span className="text-zinc-400">Traffic Telemetry:</span>
+                  <span className="text-indigo-300">Satellite Real-Time</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-400">Corridor Route:</span>
-                  <span className="text-zinc-300 truncate max-w-[140px]">{p.routeVia || 'NH 166 Highway'}</span>
+                  <span className="text-zinc-300 truncate max-w-[140px]">{p.routeVia || 'Direct Highway'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Fleet Availability:</span>
-                  <span className={p.isRegionalTier2 ? "text-amber-300 text-[10px]" : "text-emerald-400 text-[10px]"}>
-                    {p.isRegionalTier2 ? 'Intermittent Cabs / Local Auto' : 'High Density On-Demand'}
+                  <span className="text-zinc-400">Guidance Mode:</span>
+                  <span className="text-emerald-400 text-[10px]">
+                    Turn-by-Turn Driving
                   </span>
                 </div>
               </>
@@ -1299,7 +1299,7 @@ export function HITLCard({ action, onConfirm, onCancel, onUpdateParams, onQuickA
                 className="text-[10px] font-mono text-zinc-400 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <Plus size={10} className={theme.accentText} />
-                <span>{customNote ? `Note: "${customNote}"` : isCalendar ? '+ Add meeting note' : isSheets ? '+ Add transaction memo' : isUber ? '+ Add pickup instructions' : '+ Add memo'}</span>
+                <span>{customNote ? `Note: "${customNote}"` : isCalendar ? '+ Add meeting note' : isSheets ? '+ Add transaction memo' : isUber ? '+ Add travel note' : '+ Add memo'}</span>
               </button>
             ) : (
               <div className="flex items-center gap-1.5">

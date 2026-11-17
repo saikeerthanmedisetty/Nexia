@@ -780,7 +780,7 @@ A deep technical breakdown demonstrating autonomous executive orchestration pair
         }
       }
 
-      // ─── 4.4 Uber Read Operations (Fare Estimates & Service Tiers) ───
+      // ─── 4.4 Route & Navigation Read Operations (Corridor Analysis & ETA) ───
       if (intent.agent === 'UBER' && (intent.action === 'estimate' || intent.action === 'fare' || intent.action === 'fares' || intent.action === 'tariff' || intent.action === 'price')) {
         try {
           const { executeAgent } = await import('@/lib/agents');
@@ -791,20 +791,20 @@ A deep technical breakdown demonstrating autonomous executive orchestration pair
 
           return NextResponse.json({
             type: 'general',
-            response: result.data?.message || intent.response || 'Mobility tariff calculated.',
+            response: result.data?.message || intent.response || 'Route parameters calculated.',
             traceSteps: [
               {
                 id: 'trace-uber-1',
-                label: 'Calculate Mobility Route',
+                label: 'Calculate Route Corridor',
                 agent: 'UBER',
                 status: 'done',
-                detail: `Verified ${result.data?.distance_km || 19.5} km route via ${result.data?.route_via || 'NH 166'}`,
+                detail: `Verified ${result.data?.distance_km || 19.5} km corridor via ${result.data?.route_via || 'Highway Corridor'}`,
                 durationMs: 45,
               },
             ],
           });
         } catch (uberErr: any) {
-          console.error('[Chat API] Uber estimate error:', uberErr?.message);
+          console.error('[Chat API] Route estimate error:', uberErr?.message);
         }
       }
 

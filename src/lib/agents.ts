@@ -25,7 +25,7 @@ import { generateFinancialStatement } from './finance';
 export interface AgentConfig {
   id: string;
   name: string;
-  category: 'COMMUNICATION' | 'PRODUCTIVITY' | 'MEDIA' | 'MOBILITY' | 'DATABASE';
+  category: 'COMMUNICATION' | 'PRODUCTIVITY' | 'MEDIA' | 'MOBILITY' | 'NAVIGATION' | 'DATABASE';
   n8nWebhookUrl?: string;
   capabilities: string[];
   description: string;
@@ -74,16 +74,16 @@ export const AGENTS: Record<string, AgentConfig> = {
   },
   UBER: {
     id: 'UBER',
-    name: 'Executive Mobility',
-    category: 'MOBILITY',
+    name: 'Route & Navigation',
+    category: 'NAVIGATION',
     n8nWebhookUrl: process.env.N8N_UBER_WEBHOOK,
-    description: 'Orchestrates transit dispatch, route tracking, and private mobility logistics.',
+    description: 'Autonomous GPS corridor routing, live Google Maps traffic navigation, and executive travel intelligence.',
     capabilities: [
-      'Estimate ride fares & ETAs',
-      'Generate direct booking deep-links',
-      'Cross-sync trip costs to Sheets',
+      'Calculate GPS corridor distance & travel ETA',
+      'Launch live Google Maps turn-by-turn navigation',
+      'Analyze regional highway corridors & transit paths',
     ],
-    icon: 'Car',
+    icon: 'Navigation',
   },
   SHEETS: {
     id: 'SHEETS',
@@ -152,18 +152,26 @@ export async function executeAgent(
     return { success: false, error: `Agent ${agentId} not found` };
   }
 
-  // ─── Native Autonomous Mobility Execution (Zero Webhook Latency) ───
+  // ─── Native Autonomous Route & Navigation Execution (Powered by Google Maps) ───
   if (agentId === 'UBER') {
     const { calculateMobilityRoute, formatMobilityResponse } = await import('./mobility');
-    const pickupRaw = (params.pickup || params.from || 'Sanjay Ghodawat University Main Gate').toString();
-    const destinationRaw = (params.destination || params.to || 'Kolhapur Railway Station').toString();
+    const pickupRaw = (params.pickup || params.from || 'Current Location').toString();
+    const destinationRaw = (params.destination || params.to || 'Destination').toString();
     const route = calculateMobilityRoute(pickupRaw, destinationRaw);
     const act = (params.action || '').toLowerCase();
-    const tier = (params.selected_tier || params.tier || 'Uber Go').toString();
-    const selectedTierObj = route.tiers.find(t => t.name.toLowerCase().includes(tier.toLowerCase())) || route.tiers[1];
+
+    if (act.includes('cancel')) {
+      return {
+        success: true,
+        data: {
+          status: 'cancelled',
+          message: `🛡️ **Route Navigation Discarded**\n\nThe staged navigation route for ${route.cleanPickup} ➔ ${route.cleanDestination} has been discarded.`,
+        },
+      };
+    }
 
     if (act.includes('estimate') || act.includes('fare') || act.includes('price') || act.includes('option') || act.includes('tariff')) {
-      const message = formatMobilityResponse(route, tier);
+      const message = formatMobilityResponse(route);
       return {
         success: true,
         data: {
@@ -177,70 +185,26 @@ export async function executeAgent(
           is_regional: route.isRegionalTier2,
           region_name: route.regionName,
           tiers: route.tiers,
-          bookingUrl: route.bookingUrl,
+          bookingUrl: route.googleMapsUrl,
+          googleMapsUrl: route.googleMapsUrl,
           message,
         },
       };
     }
 
-    if (act.includes('telemetry') || act.includes('track') || act.includes('status')) {
-      const regionalNotice = route.isRegionalTier2
-        ? `\n\n📍 *Regional Note: In ${route.regionName}, on-demand Uber cabs operate with intermittent driver availability. Local auto-rickshaws stationed at ${route.cleanPickup} or city cabs provide 24/7 immediate transit along NH 166.*`
-        : '';
-      return {
-        success: true,
-        data: {
-          status: 'verified_route',
-          booking_id: params.booking_id || 'UBER-ROUTE-VERIFIED',
-          pickup: route.cleanPickup,
-          destination: route.cleanDestination,
-          distance: `${route.distanceKm} km`,
-          duration: `${route.durationMins} mins via ${route.routeVia}`,
-          bookingUrl: route.bookingUrl,
-          message: `📡 **Mobility Telemetry & Route Verified**\n\n• **Route:** ${route.cleanPickup} ➔ ${route.cleanDestination}\n• **Verified Distance:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : ''}\n• **Service Tier:** ${selectedTierObj.name} (Estimated: ₹${selectedTierObj.minFare} – ₹${selectedTierObj.maxFare})\n\n🔗 **[Open Official Uber App to Match Active Drivers](${route.bookingUrl})**${regionalNotice}`,
-        },
-      };
-    }
-
-    if (act.includes('cancel')) {
-      return {
-        success: true,
-        data: {
-          status: 'cancelled',
-          message: `🛡️ **Ride Request Cancelled**\n\nThe pending ride request for ${route.cleanPickup} ➔ ${route.cleanDestination} has been cancelled. No charges were incurred.`,
-        },
-      };
-    }
-
-    if (!route.uberServiceAvailable) {
-      const responseText = formatMobilityResponse(route);
-      return {
-        success: true,
-        data: {
-          status: 'unavailable_locally',
-          pickup: route.cleanPickup,
-          destination: route.cleanDestination,
-          distance_km: route.distanceKm,
-          googleMapsUrl: route.googleMapsUrl,
-          message: responseText,
-        },
-      };
-    }
-
-    // Default: Dispatch / Booking confirmation for metro zones where Uber operates
+    // Default execution on confirmation: Launch Google Maps turn-by-turn navigation
     return {
       success: true,
       data: {
-        status: 'dispatched_ready',
-        booking_id: params.booking_id || `UBER-${Date.now().toString(36).toUpperCase()}`,
+        status: 'navigation_launched',
         pickup: route.cleanPickup,
         destination: route.cleanDestination,
-        tier: selectedTierObj.name,
-        fare: selectedTierObj.fareRange,
         distance: `${route.distanceKm} km`,
         duration: `${route.durationMins} mins`,
-        bookingUrl: route.bookingUrl,
-        message: `🚗 **Mobility Dispatch Configured**\n\n• **Pickup:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Service Tier:** ${selectedTierObj.name}\n• **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Scheduled Departure:** ${route.scheduledTime}` : ''}\n• **Estimated Tariff:** ${selectedTierObj.fareRange}\n\n📲 **[Launch Official Uber App to Finalize Driver Match](${route.bookingUrl})**`,
+        routeVia: route.routeVia,
+        bookingUrl: route.googleMapsUrl,
+        googleMapsUrl: route.googleMapsUrl,
+        message: `🗺️ **Live Route Navigation Launched on Google Maps**\n\n• **Origin:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Corridor:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : ''}\n\n📍 **[Open Live Turn-by-Turn Navigation on Google Maps](${route.googleMapsUrl})**\n*(Google Maps opened with pre-filled route and live traffic guidance)*`,
       },
     };
   }

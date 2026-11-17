@@ -41,10 +41,9 @@ export async function POST(req: Request) {
       else if (normalizedAction.includes('sum') || normalizedAction.includes('notes')) normalizedAction = 'summarize';
       else normalizedAction = 'search';
     } else if (agentId === 'UBER') {
-      if (normalizedAction.includes('telemetry') || normalizedAction.includes('track') || normalizedAction.includes('status') || normalizedAction.includes('accept')) normalizedAction = 'telemetry';
-      else if (normalizedAction.includes('cancel')) normalizedAction = 'cancel';
-      else if (normalizedAction.includes('book') || normalizedAction.includes('ride') || normalizedAction.includes('confirm')) normalizedAction = 'book';
-      else normalizedAction = 'estimate';
+      if (normalizedAction.includes('cancel')) normalizedAction = 'cancel';
+      else if (normalizedAction.includes('estimate') || normalizedAction.includes('fare') || normalizedAction.includes('tariff') || normalizedAction.includes('price')) normalizedAction = 'estimate';
+      else normalizedAction = 'navigate';
     } else if (agentId === 'SHEETS') {
       if (normalizedAction.includes('list') || normalizedAction.includes('show') || normalizedAction.includes('view') || normalizedAction.includes('get') || normalizedAction.includes('read') || normalizedAction.includes('check')) {
         normalizedAction = 'list';
@@ -55,7 +54,6 @@ export async function POST(req: Request) {
       normalizedAction = 'briefing';
     }
 
-    const dynamicBookingId = params?.booking_id || `UBER-IND-${Math.floor(100000 + Math.random() * 900000)}`;
     const dynamicPickup = params?.pickup || params?.from || 'Current Location';
     const dynamicDestination = params?.destination || params?.dropoff || params?.to || 'Dropoff Location';
 
@@ -63,16 +61,12 @@ export async function POST(req: Request) {
       action: normalizedAction,
       ...body,
       ...params,
-      selected_tier: params?.selected_tier || params?.tier || 'Uber Go',
-      tier: params?.tier || params?.selected_tier || 'Uber Go',
-      locked_fare: params?.locked_fare || (params?.fare ? `₹${params.fare}` : 'Dynamic Tariff'),
-      fare: params?.fare || 300,
       pickup: dynamicPickup,
       destination: dynamicDestination,
       dropoff: dynamicDestination,
       distance: params?.distance || (params?.distance_km ? `${params.distance_km} km` : 'Dynamic Route'),
       duration: params?.duration || (params?.duration_mins ? `${params.duration_mins} mins` : 'Dynamic ETA'),
-      booking_id: dynamicBookingId,
+      googleMapsUrl: params?.googleMapsUrl || `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(dynamicPickup)}&destination=${encodeURIComponent(dynamicDestination)}&travelmode=driving`,
       timestamp: Date.now(),
       message: params?.rawPrompt || params?.userPrompt || params?.message || params?.prompt || params?.title || '',
       to: params?.to || '',

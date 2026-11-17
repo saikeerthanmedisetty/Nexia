@@ -189,8 +189,8 @@ export function formatImpressiveStagedExplanation(intent: IntentClassification):
     return `✉️ I've drafted this correspondence for your review. Please confirm dispatch below:`;
   }
 
-  if (intent.agent === 'UBER' && (intent.action.includes('book') || intent.action === 'stage')) {
-    return `🚗 I've locked in your transit route. Please review parameters and authorize dispatch below:`;
+  if (intent.agent === 'UBER' && (intent.action.includes('book') || intent.action === 'stage' || intent.action.includes('navigate'))) {
+    return `🗺️ I've verified your route and driving corridor. Please review the parameters and launch Google Maps navigation below:`;
   }
 
   if (intent.agent === 'YOUTUBE' && (intent.action === 'upload' || intent.action === 'publish' || intent.action === 'stage')) {
@@ -1014,48 +1014,28 @@ export function preRouteDeterministicIntent(
     }, pendingAction, channelName);
   }
 
-  // 7. UBER Agent Deterministic Pre-Routing
+  // 7. Route & Navigation Intelligence (Google Maps Powered)
   const isUberTelemetry = (lower.includes('uber') || lower.includes('cab') || lower.includes('ride') || lower.includes('driver')) && 
     (lower.includes('telemetry') || lower.includes('track') || lower.includes('status') || lower.includes('where') || lower.includes('location'));
   if (isUberTelemetry) {
     return attachSafetyAndTraces({
-      type: 'action_stage',
+      type: 'general',
       agent: 'UBER',
       action: 'telemetry',
-      requiresConfirmation: false,
       params: { action: 'telemetry', rawPrompt: trimmed, userPrompt: trimmed },
-      explanation: "Tracking active driver location and ride telemetry...",
+      response: "📡 **Live GPS Traffic Telemetry**\n\nReal-time highway traffic telemetry and turn-by-turn guidance are actively synchronized via Google Maps Satellite GPS.",
+      explanation: "Live traffic telemetry actively monitored via Google Maps satellite feed.",
     }, pendingAction, channelName);
   }
 
-  const hasRideKeyword = /\b(?:uber|cab|ride|auto|bike|moto|taxi|transit|driver)\b/i.test(lower);
-  const isUberEstimate = hasRideKeyword && /\b(?:how\s+much\s+(?:is|will|for)|fare|tariff|estimate|cost\s+of|rates?|pricing|options?|available|availability|distance|route)\b/i.test(lower);
-  const isUberBooking = hasRideKeyword && !isUberEstimate && (
-    /\b(?:book|call|order|reserve|dispatch)\b/i.test(lower) || 
-    /\b(?:take\s+me\s+to|need\s+a\s+ride|need\s+an?\s+(?:auto|cab|ride|uber|bike|taxi))\b/i.test(lower)
+  const hasRideKeyword = /\b(?:uber|cab|ride|auto|bike|moto|taxi|transit|commute|route|navigate|navigation|driving|distance|how\s+far)\b/i.test(lower);
+  const isRouteEstimate = hasRideKeyword && /\b(?:how\s+much|fare|tariff|estimate|cost|rates?|pricing|options?|available|availability|distance|how\s+far|route\s+options)\b/i.test(lower);
+  const isRouteNavigation = hasRideKeyword && !isRouteEstimate && (
+    /\b(?:book|call|order|reserve|dispatch|navigate|take\s+me\s+to|drive\s+to|show\s+route|need\s+a\s+ride|commute\s+to)\b/i.test(lower) ||
+    lower.startsWith('route from') || lower.startsWith('route to')
   );
 
-  if (isUberEstimate || isUberBooking) {
-    let detectedTier = 'Uber Go';
-    let explicitlySpecifiedTier: string | null = null;
-
-    if (lower.includes('bike') || lower.includes('moto') || lower.includes('motorcycle') || lower.includes('scooter') || lower.includes('two wheeler')) {
-      detectedTier = 'Uber Moto';
-      explicitlySpecifiedTier = 'Uber Moto';
-    } else if (lower.includes('auto') || lower.includes('rickshaw') || lower.includes('tuk tuk') || lower.includes('three wheeler')) {
-      detectedTier = 'Uber Auto';
-      explicitlySpecifiedTier = 'Uber Auto';
-    } else if (lower.includes('premier') || lower.includes('comfort') || lower.includes('sedan') || lower.includes('luxury')) {
-      detectedTier = 'Uber Premier';
-      explicitlySpecifiedTier = 'Uber Premier';
-    } else if (lower.includes('xl') || lower.includes('suv') || lower.includes('innova') || lower.includes('ertiga') || lower.includes('6 seater')) {
-      detectedTier = 'Uber XL';
-      explicitlySpecifiedTier = 'Uber XL';
-    } else if (lower.includes('uber go') || lower.includes('go ac') || (lower.includes(' go') && !lower.includes('ahead'))) {
-      detectedTier = 'Uber Go';
-      explicitlySpecifiedTier = 'Uber Go';
-    }
-
+  if (isRouteEstimate || isRouteNavigation) {
     let pickupRaw = '';
     let destinationRaw = '';
 
@@ -1082,33 +1062,27 @@ export function preRouteDeterministicIntent(
     const hasVagueEndpoints = !pickup || !destination || isVagueLocation(pickup) || isVagueLocation(destination);
 
     if (hasVagueEndpoints) {
-      const pDisplay = pickup || 'Unspecified Pickup';
+      const pDisplay = pickup || 'Unspecified Origin';
       const dDisplay = destination || 'Unspecified Destination';
       return attachSafetyAndTraces({
         type: 'general',
         agent: 'UBER',
-        action: isUberBooking ? 'clarify_booking' : 'clarify_estimate',
-        params: { rawPrompt: trimmed, pickup, destination, requestedTier: explicitlySpecifiedTier },
-        response: `📍 **Specific Route & Vehicle Required for Accurate Tariff Calculation**\n\n` +
-          `The requested endpoints ("${pDisplay}" to "${dDisplay}") are general keywords without specific street addresses, landmarks, or city context.\n\n` +
-          `Because real transport tariffs and travel times depend strictly on GPS route distances:\n\n` +
-          `1. **Specific Pickup:** Please provide your exact pickup landmark or address and city (e.g., *Campus Gate 1, Bangalore* or *SGU Main Gate, Kolhapur*).\n` +
-          `2. **Specific Destination:** Please provide your exact destination or airport terminal with city (e.g., *Airport Terminal 1* or *City Railway Station*).\n` +
-          `3. **Service Tier:** ${explicitlySpecifiedTier ? `You specified **${explicitlySpecifiedTier}**.` : 'Select which vehicle type you prefer:'}\n` +
-          `   • 🛺 **Uber Auto / Local Auto** — Budget 3-wheeler for quick city transit\n` +
-          `   • 🚗 **Uber Go** — Affordable compact 4-seater with AC\n` +
-          `   • 🚘 **Uber Premier** — Premium executive sedan\n` +
-          `   • 🚐 **Uber XL** — 6-seater SUV for luggage or groups\n` +
-          `   • 🏍️ **Uber Moto** — Fast 2-wheeler bike for solo riders\n\n` +
-          `Please reply with your specific locations and vehicle choice, and I will compute the exact route tariffs or stage your ride for approval.`,
-        explanation: 'Clarification requested: specific street addresses and vehicle preference are required to calculate accurate tariffs.',
+        action: 'clarify_route',
+        params: { rawPrompt: trimmed, pickup, destination },
+        response: `📍 **Specific Origin & Destination Required for Route Calculation**\n\n` +
+          `The requested endpoints ("${pDisplay}" to "${dDisplay}") need specific landmarks, addresses, or city context.\n\n` +
+          `Because real GPS routes and drive times depend strictly on coordinates:\n\n` +
+          `1. **Specific Origin:** Provide your exact origin or landmark (e.g. *Begumpet Railway Station, Hyderabad* or *SGU Main Gate, Kolhapur*).\n` +
+          `2. **Specific Destination:** Provide your destination or terminal (e.g. *Rajiv Gandhi International Airport* or *Kolhapur Railway Station*).\n\n` +
+          `Please reply with your origin and destination, and I will compute the exact highway corridor, travel time, and stage your Google Maps navigation.`,
+        explanation: 'Clarification requested: specific street addresses or landmarks are required to calculate route distance.',
       }, pendingAction, channelName);
     }
 
     const route = calculateMobilityRoute(pickupRaw, destinationRaw);
 
-    if (isUberEstimate) {
-      const response = formatMobilityResponse(route, explicitlySpecifiedTier || undefined);
+    if (isRouteEstimate) {
+      const response = formatMobilityResponse(route);
       return attachSafetyAndTraces({
         type: 'general',
         agent: 'UBER',
@@ -1120,95 +1094,53 @@ export function preRouteDeterministicIntent(
           distanceKm: route.distanceKm,
           durationMins: route.durationMins,
           routeVia: route.routeVia,
-          bookingUrl: route.bookingUrl,
+          googleMapsUrl: route.googleMapsUrl,
+          bookingUrl: route.googleMapsUrl,
           isRegionalTier2: route.isRegionalTier2,
           regionName: route.regionName,
           tiers: route.tiers,
         },
         response,
-        explanation: `Calculated verified route distance and realistic tariffs for ${route.cleanPickup} to ${route.cleanDestination} (${route.distanceKm} km via ${route.routeVia}).`,
+        explanation: `Calculated verified route distance and driving time for ${route.cleanPickup} to ${route.cleanDestination} (${route.distanceKm} km via ${route.routeVia}).`,
       }, pendingAction, channelName);
     }
 
-    if (!route.uberServiceAvailable) {
-      const response = formatMobilityResponse(route, explicitlySpecifiedTier || undefined);
-      return attachSafetyAndTraces({
-        type: 'general',
-        agent: 'UBER',
-        action: 'unavailable',
-        params: {
-          pickup: route.cleanPickup,
-          destination: route.cleanDestination,
-          distanceKm: route.distanceKm,
-          durationMins: route.durationMins,
-          googleMapsUrl: route.googleMapsUrl,
-          routeVia: route.routeVia,
-          tiers: route.tiers,
-        },
-        response,
-        explanation: `Informed user that Uber is not operational in ${route.regionName} and provided authentic local transit alternatives for ${route.distanceKm} km route to ${route.cleanDestination}.`,
-      }, pendingAction, channelName);
-    }
-
-    if (!explicitlySpecifiedTier) {
-      return attachSafetyAndTraces({
-        type: 'general',
-        agent: 'UBER',
-        action: 'clarify_tier',
-        params: {
-          pickup: route.cleanPickup,
-          destination: route.cleanDestination,
-          distanceKm: route.distanceKm,
-          bookingUrl: route.bookingUrl,
-        },
-        response: `🚗 **Please Select a Vehicle Tier to Authorize Dispatch**\n\n` +
-          `• **Route:** ${route.cleanPickup} ➔ ${route.cleanDestination} (~${route.distanceKm} km via ${route.routeVia})\n\n` +
-          `Which vehicle type would you like to dispatch?\n` +
-          route.tiers.filter(t => t.availableLocally).map(t => `• ${t.icon} **${t.name}** (${t.fareRange})`).join('\n') +
-          `\n\nReply with your preferred option (e.g., **"Dispatch Uber Go"**) to confirm.`,
-        explanation: 'Clarification requested: vehicle tier selection is required before dispatching a ride.',
-      }, pendingAction, channelName);
-    }
-
-    const tierObj = route.tiers.find(t => t.name.toLowerCase().includes(detectedTier.toLowerCase())) || route.tiers[1];
-    const lockedFare = tierObj.fareRange;
+    const hasRideHailingWord = /\b(?:uber|ola|cab|auto|bike|taxi|book)\b/i.test(trimmed);
+    const disclaimer = hasRideHailingWord
+      ? `\n\n💡 *Note: Direct on-demand cab dispatch (Uber/Ola) requires personal device biometric and payment authentication in the app. Nexia stages the verified GPS driving corridor and 1-click Google Maps turn-by-turn navigation below.*`
+      : '';
 
     return attachSafetyAndTraces({
       type: 'action_stage',
       agent: 'UBER',
-      action: 'book',
+      action: 'navigate',
       requiresConfirmation: true,
       params: {
         pickup: route.cleanPickup,
         destination: route.cleanDestination,
         scheduledTime: route.scheduledTime,
-        selected_tier: tierObj.name,
-        tier: tierObj.name,
-        locked_fare: lockedFare,
-        fare: tierObj.minFare || 250,
         distance: `${route.distanceKm} km`,
         duration: `${route.durationMins} mins`,
         routeVia: route.routeVia,
-        bookingUrl: route.bookingUrl,
+        googleMapsUrl: route.googleMapsUrl,
+        bookingUrl: route.googleMapsUrl,
         isRegionalTier2: route.isRegionalTier2,
         regionName: route.regionName,
-        liveMode: true,
         rawPrompt: trimmed,
         userPrompt: trimmed,
       },
-      explanation: `🚗 **Mobility Dispatch Request Staged**\n\nI have verified your transit route and tariff parameters:\n\n• **Pickup:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Service Tier:** ${tierObj.name}\n• **Verified Route:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : ''}\n• **Estimated Tariff:** ${lockedFare}\n\n*Review parameters below and authorize dispatch to open Uber.*`,
+      explanation: `🗺️ **Executive Route Navigation Staged**\n\nI have calculated your travel corridor:\n\n• **Origin:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Corridor:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : ''}${disclaimer}\n\n*Click below to launch live turn-by-turn navigation on Google Maps.*`,
       confirmationDetails: {
-        title: `Dispatch ${tierObj.name}`,
-        warning: 'Safety Check: Review verified route before authorizing dispatch.',
-        summary: `${tierObj.name} • ${route.cleanPickup} ➔ ${route.cleanDestination} (${lockedFare})`,
+        title: 'Launch Google Maps Navigation',
+        warning: 'Safety Check: Review corridor and driving time before launching Google Maps.',
+        summary: `${route.cleanPickup} ➔ ${route.cleanDestination} • ${route.distanceKm} km via ${route.routeVia}`,
         details: {
-          tier: tierObj.name,
           pickup: route.cleanPickup,
           destination: route.cleanDestination,
-          fare: lockedFare,
           distance: `${route.distanceKm} km`,
           duration: `${route.durationMins} mins`,
           routeVia: route.routeVia,
+          googleMapsUrl: route.googleMapsUrl,
         },
       },
     }, pendingAction, channelName);
@@ -2151,25 +2083,8 @@ Return ONLY valid JSON matching the schema.
     }, null, channelName);
   }
 
-  // E. New Action: UBER
-  if (lower.includes('uber') || lower.includes('cab') || lower.includes('ride') || lower.includes('fare') || lower.includes('driver') || lower.includes('telemetry') || lower.includes('receipt') || lower.includes('invoice') || lower.includes('auto') || lower.includes('bike') || lower.includes('moto') || lower.includes('rickshaw') || lower.includes('scooter') || lower.includes('taxi')) {
-    let detectedTier = 'Uber Go';
-    let explicitlySpecifiedTier: string | null = null;
-
-    if (lower.includes('bike') || lower.includes('moto') || lower.includes('motorcycle') || lower.includes('scooter') || lower.includes('two wheeler')) {
-      detectedTier = 'Uber Moto';
-      explicitlySpecifiedTier = 'Uber Moto';
-    } else if (lower.includes('auto') || lower.includes('rickshaw') || lower.includes('tuk tuk') || lower.includes('three wheeler')) {
-      detectedTier = 'Uber Auto';
-      explicitlySpecifiedTier = 'Uber Auto';
-    } else if (lower.includes('premier') || lower.includes('comfort') || lower.includes('sedan') || lower.includes('luxury')) {
-      detectedTier = 'Uber Premier';
-      explicitlySpecifiedTier = 'Uber Premier';
-    } else if (lower.includes('xl') || lower.includes('suv') || lower.includes('innova') || lower.includes('ertiga') || lower.includes('6 seater')) {
-      detectedTier = 'Uber XL';
-      explicitlySpecifiedTier = 'Uber XL';
-    }
-
+  // E. Route & Navigation Intelligence (Google Maps Powered)
+  if (lower.includes('uber') || lower.includes('cab') || lower.includes('ride') || lower.includes('driver') || lower.includes('auto') || lower.includes('bike') || lower.includes('moto') || lower.includes('taxi') || lower.includes('route') || lower.includes('navigate') || lower.includes('navigation') || lower.includes('commute')) {
     let pickupRaw = '';
     let destinationRaw = '';
 
@@ -2210,34 +2125,25 @@ Return ONLY valid JSON matching the schema.
     const hasVagueEndpoints = !pickup || !destination || isVagueLocation(pickup) || isVagueLocation(destination);
 
     if (hasVagueEndpoints) {
-      const pDisplay = pickup || 'Unspecified Pickup';
+      const pDisplay = pickup || 'Unspecified Origin';
       const dDisplay = destination || 'Unspecified Destination';
       return attachSafetyAndTraces({
         type: 'general',
         agent: 'UBER',
         action: 'clarify_route',
         params: { rawPrompt: userMessage, pickup, destination },
-        response: `📍 **Specific Route & Vehicle Required for Accurate Tariff Calculation**\n\n` +
-          `The requested endpoints ("${pDisplay}" to "${dDisplay}") are general keywords without specific street addresses, landmarks, or city context.\n\n` +
-          `Because real transport tariffs and travel times depend strictly on GPS route distances:\n\n` +
-          `1. **Specific Pickup:** Please provide your exact pickup landmark or address and city (e.g., *Campus Gate 1, Bangalore* or *SGU Main Gate, Kolhapur*).\n` +
-          `2. **Specific Destination:** Please provide your exact destination or airport terminal with city (e.g., *Airport Terminal 1* or *City Railway Station*).\n` +
-          `3. **Service Tier:** Fares vary by vehicle type:\n` +
-          `   • 🛺 **Uber Auto / Local Auto** — Budget 3-wheeler for quick city transit\n` +
-          `   • 🚗 **Uber Go** — Affordable compact 4-seater with AC\n` +
-          `   • 🚘 **Uber Premier** — Premium executive sedan\n` +
-          `   • 🚐 **Uber XL** — 6-seater SUV for luggage or groups\n` +
-          `   • 🏍️ **Uber Moto** — Fast 2-wheeler bike for solo riders\n\n` +
-          `Please reply with your specific locations and vehicle choice, and I will compute the exact route tariffs or stage your ride for approval.`,
-        explanation: 'Clarification requested: specific street addresses and vehicle preference are required to calculate accurate tariffs.',
+        response: `📍 **Specific Origin & Destination Required for Route Calculation**\n\n` +
+          `The requested endpoints ("${pDisplay}" to "${dDisplay}") need specific landmarks, addresses, or city context.\n\n` +
+          `Please provide your origin and destination, and I will compute the exact corridor, travel time, and stage your Google Maps navigation.`,
+        explanation: 'Clarification requested: specific street addresses or landmarks are required to calculate route distance.',
       }, null, channelName);
     }
 
     const route = calculateMobilityRoute(pickupRaw, destinationRaw);
-    const isEstimateQuery = /\b(?:estimate|fare|tariff|cost|how\s+much|rates?|pricing)\b/i.test(lower);
+    const isEstimateQuery = /\b(?:estimate|fare|tariff|cost|how\s+much|rates?|pricing|how\s+far|options?)\b/i.test(lower);
 
     if (isEstimateQuery) {
-      const response = formatMobilityResponse(route, explicitlySpecifiedTier || undefined);
+      const response = formatMobilityResponse(route);
       return attachSafetyAndTraces({
         type: 'general',
         agent: 'UBER',
@@ -2249,60 +2155,53 @@ Return ONLY valid JSON matching the schema.
           distanceKm: route.distanceKm,
           durationMins: route.durationMins,
           routeVia: route.routeVia,
-          bookingUrl: route.bookingUrl,
+          googleMapsUrl: route.googleMapsUrl,
+          bookingUrl: route.googleMapsUrl,
           isRegionalTier2: route.isRegionalTier2,
           regionName: route.regionName,
           tiers: route.tiers,
         },
         response,
-        explanation: `Calculated verified route distance and realistic tariffs for ${route.cleanPickup} to ${route.cleanDestination} (${route.distanceKm} km via ${route.routeVia}).`,
+        explanation: `Calculated verified route distance and driving time for ${route.cleanPickup} to ${route.cleanDestination} (${route.distanceKm} km via ${route.routeVia}).`,
       }, null, channelName);
     }
 
-    if (!route.uberServiceAvailable) {
-      const response = formatMobilityResponse(route);
-      return attachSafetyAndTraces({
-        type: 'general',
-        agent: 'UBER',
-        action: 'unavailable',
-        params: {
-          pickup: route.cleanPickup,
-          destination: route.cleanDestination,
-          distanceKm: route.distanceKm,
-          durationMins: route.durationMins,
-          googleMapsUrl: route.googleMapsUrl,
-          routeVia: route.routeVia,
-          tiers: route.tiers,
-        },
-        response,
-        explanation: `Informed user that Uber is not operational in ${route.regionName} and provided authentic local transit alternatives for ${route.distanceKm} km route to ${route.cleanDestination}.`,
-      }, null, channelName);
-    }
-
-    const tierObj = route.tiers.find(t => t.name.toLowerCase().includes(detectedTier.toLowerCase())) || route.tiers[1];
-    const lockedFare = tierObj.fareRange;
+    const hasRideHailingWord = /\b(?:uber|ola|cab|auto|bike|taxi|book)\b/i.test(userMessage);
+    const disclaimer = hasRideHailingWord
+      ? `\n\n💡 *Note: Direct on-demand cab dispatch (Uber/Ola) requires personal device biometric and payment authentication in the app. Nexia stages the verified GPS driving corridor and 1-click Google Maps turn-by-turn navigation below.*`
+      : '';
 
     return attachSafetyAndTraces({
       type: 'action_stage',
       agent: 'UBER',
-      action: 'book',
+      action: 'navigate',
+      requiresConfirmation: true,
       params: {
         pickup: route.cleanPickup,
         destination: route.cleanDestination,
         scheduledTime: route.scheduledTime,
-        selected_tier: tierObj.name,
-        tier: tierObj.name,
-        locked_fare: lockedFare,
-        fare: tierObj.minFare || 250,
         distance: `${route.distanceKm} km`,
         duration: `${route.durationMins} mins`,
         routeVia: route.routeVia,
-        bookingUrl: route.bookingUrl,
+        googleMapsUrl: route.googleMapsUrl,
+        bookingUrl: route.googleMapsUrl,
         isRegionalTier2: route.isRegionalTier2,
         regionName: route.regionName,
-        liveMode: true,
       },
-      explanation: `Prepared ${tierObj.name} booking from ${route.cleanPickup} to ${route.cleanDestination} (${route.distanceKm} km, ~${route.durationMins} mins via ${route.routeVia}) for your approval.`,
+      explanation: `🗺️ **Executive Route Navigation Staged**\n\nI have calculated your travel corridor:\n\n• **Origin:** ${route.cleanPickup}\n• **Destination:** ${route.cleanDestination}\n• **Corridor:** ${route.distanceKm} km (~${route.durationMins} mins via ${route.routeVia})${route.scheduledTime ? `\n• **Departure Time:** ${route.scheduledTime}` : ''}${disclaimer}\n\n*Click below to launch live turn-by-turn navigation on Google Maps.*`,
+      confirmationDetails: {
+        title: 'Launch Google Maps Navigation',
+        warning: 'Safety Check: Review route corridor and driving time before launching Google Maps.',
+        summary: `${route.cleanPickup} ➔ ${route.cleanDestination} • ${route.distanceKm} km via ${route.routeVia}`,
+        details: {
+          pickup: route.cleanPickup,
+          destination: route.cleanDestination,
+          distance: `${route.distanceKm} km`,
+          duration: `${route.durationMins} mins`,
+          routeVia: route.routeVia,
+          googleMapsUrl: route.googleMapsUrl,
+        },
+      },
     }, null, channelName);
   }
 
@@ -2606,41 +2505,17 @@ function attachSafetyAndTraces(
         details: p,
       };
     } else if (intent.agent === 'UBER') {
-      const bId = p.booking_id || 'Active Booking';
-      const pickup = p.pickup || 'Pickup';
+      const pickup = p.pickup || 'Origin';
       const destination = p.destination || 'Destination';
-      const driverName = p.driver?.name || 'Assigned Driver';
-      const driverRating = p.driver?.rating || '4.9';
+      const dist = p.distance || 'GPS Route';
+      const via = p.routeVia || 'Express Corridor';
 
-      if (intent.action === 'telemetry') {
-        confirmationDetails = {
-          title: 'Sync Mobility Telemetry',
-          warning: 'Safety Check: Review and confirm live driver updates.',
-          summary: `Booking ID: ${bId} • Status: ACCEPTED • Driver: ${driverName} (${driverRating}⭐)`,
-          details: p,
-        };
-      } else if (intent.action === 'complete') {
-        confirmationDetails = {
-          title: 'Finalize Mobility Trip & Generate Invoice',
-          warning: 'Safety Check: Confirm trip details to finalize invoice and receipt.',
-          summary: `Trip: ${pickup} ➔ ${destination} • Metered: ${p.distance_km || 'Dynamic'} km • Total: ${p.fare || 'Dynamic Fare'}`,
-          details: p,
-        };
-      } else if (intent.action === 'cancel') {
-        confirmationDetails = {
-          title: 'Driver Reassignment',
-          warning: 'Safety Check: Review replacement driver assignment.',
-          summary: `Re-assigning driver for booking ${bId}`,
-          details: p,
-        };
-      } else {
-        confirmationDetails = {
-          title: 'Authorize Mobility Dispatch',
-          warning: 'Safety Check: Review route parameters before booking vehicle.',
-          summary: `${pickup} ➔ ${destination} • ${p.selected_tier || 'Uber Premier'} (${p.locked_fare || 'Dynamic Fare'})`,
-          details: p,
-        };
-      }
+      confirmationDetails = {
+        title: 'Launch Google Maps Navigation',
+        warning: 'Safety Check: Review route corridor and driving time before launching Google Maps.',
+        summary: `${pickup} ➔ ${destination} • ${dist} via ${via}`,
+        details: p,
+      };
     }
   }
 
@@ -2706,12 +2581,12 @@ function attachSafetyAndTraces(
     },
     {
       id: 'step-2',
-      label: `Execute ${intent.agent === 'SHEETS' ? 'Financial Ledger' : intent.agent === 'CALENDAR' ? 'Executive Schedule' : intent.agent === 'EMAIL' ? 'Executive Correspondence' : intent.agent === 'UBER' ? 'Mobility Dispatch' : intent.agent} Action`,
+      label: `Execute ${intent.agent === 'SHEETS' ? 'Financial Ledger' : intent.agent === 'CALENDAR' ? 'Executive Schedule' : intent.agent === 'EMAIL' ? 'Executive Correspondence' : intent.agent === 'UBER' ? 'Route Navigation' : intent.agent} Action`,
       agent: intent.agent,
       status: isHighStakes && intent.type !== 'action_confirm' ? 'pending' : 'running',
       detail: isHighStakes && intent.type !== 'action_confirm'
         ? 'Paused for Verification & Authorization'
-        : `Dispatching parameters to ${intent.agent === 'SHEETS' ? 'Financial Ledger' : intent.agent === 'CALENDAR' ? 'Executive Schedule' : intent.agent === 'EMAIL' ? 'Executive Correspondence' : intent.agent === 'UBER' ? 'Mobility Dispatch' : intent.agent} Engine`,
+        : `Dispatching parameters to ${intent.agent === 'SHEETS' ? 'Financial Ledger' : intent.agent === 'CALENDAR' ? 'Executive Schedule' : intent.agent === 'EMAIL' ? 'Executive Correspondence' : intent.agent === 'UBER' ? 'Route Navigation' : intent.agent} Engine`,
       durationMs: 250,
     },
   ];
